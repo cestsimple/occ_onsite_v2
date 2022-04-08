@@ -95,19 +95,27 @@ WSGI_APPLICATION = 'onsite_v2.wsgi.application'
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 
 DATABASES = {
+    # 'default': {
+    #     'ENGINE': 'sql_server.pyodbc',
+    #     'NAME': 'IOT_V2',
+    #     #'HOST': 'localhost',
+    #     'HOST': 'localhost\SQLEXPRESS',
+    #     'USER': 'django_iot',
+    #     'PASSWORD': 'welcome',
+    #     'PORT': '1433',
+    #     'OPTIONS': {
+    #         'query_timeout': 10,
+    #         'driver': 'ODBC Driver 17 for SQL Server'
+    #     }
+    # }
     'default': {
-        'ENGINE': 'sql_server.pyodbc',
-        'NAME': 'IOT_V2',
-        #'HOST': 'localhost',
-        'HOST': 'localhost\SQLEXPRESS',
-        'USER': 'django_iot',
-        'PASSWORD': 'welcome',
-        'PORT': '1433',
-        'OPTIONS': {
-            'query_timeout': 10,
-            'driver': 'ODBC Driver 17 for SQL Server'
-        }
-    }
+        'ENGINE': 'django.db.backends.mysql', # 数据库引擎
+        'HOST': 'localhost', # 数据库主机
+        'PORT': 3306, # 数据库端口
+        'USER': 'django_iot', # 数据库用户名
+        'PASSWORD': 'welcome', # 数据库用户密码
+        'NAME': 'IOT_v2' # 数据库名字
+    },
 }
 
 

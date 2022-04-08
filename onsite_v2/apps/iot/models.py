@@ -5,10 +5,11 @@ from apps.user.models import User
 class AsyncJob(models.Model):
     """系统设置"""
     id = models.AutoField(primary_key=True, verbose_name='数字id')
-    job = models.CharField(max_length=30, verbose_name='储罐大小', null=False, blank=False)
-    finished = models.BooleanField(default=False)
-    create_time = models.DateTimeField()
-    finish_time = models.DateTimeField()
+    name = models.CharField(max_length=30, verbose_name='储罐大小', null=False, blank=False)
+    result = models.CharField(max_length=30, verbose_name='运行结果', default='')
+    start_time = models.DateTimeField(null=False)
+    finish_time = models.DateTimeField(null=True)
+    is_deleted = models.BooleanField(default=False)
 
 
 class Region(models.Model):

@@ -68,6 +68,7 @@ def multi_thread_task(multi_num, target_task, task_args):
     # 循环执行线程列表中的任务
     for task in sub_thread_task:
         try:
+            task.setDaemon(True)
             task.start()
         except Exception as e:
             print(f"进程创建失败 - {e}")
@@ -255,8 +256,8 @@ class TagData(View):
         jobs.update('IOT_TAG', 'OK')
 
     def refresh_sub(self, assets):
+        header = get_cognito()
         for asset in assets:
-            header = get_cognito()
             url = f'{URL}/assets/{asset.uuid}/tags'
             res = requests.get(url, headers=header).json()
             for tag in res['content']:

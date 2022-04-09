@@ -3,7 +3,7 @@ import requests
 from django.http import JsonResponse
 from django.views import View
 from pycognito import Cognito
-from .models import AsyncJob, Site, Asset
+from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk
 from datetime import datetime, timedelta
 from utils import jobs
 
@@ -22,25 +22,31 @@ def get_cognito():
         token_record = token_record[0]
         if token_record.finish_time > time_now:
             token = token_record.result
-    else:
-        # 申请token
-        username = 'xiangzhe.hou@airliquide.com'
-        password = 'Sunboy27!'
-        user = Cognito(
-            user_pool_id='eu-west-1_XxAZFKMzE',
-            client_id='oppih8pblveb0qb27sl8k9ubc',
-            user_pool_region='eu-west-1',
-            username=username,
-        )
-        user.authenticate(password=password)
-        token = 'Bearer ' + user.id_token.strip()
+            h = {
+                'Host': 'bos.iot.airliquide.com',
+                'Authorization': token,
+                'business-profile-id': '8e15368e-39c7-437f-9721-e5e54dcd207d',
+            }
+            return h
 
-        # 存入数据库
-        AsyncJob.objects.create(
-            name='IOT_TOKEN',
-            result=token,
-            start_time=time_now,
-            finish_time=time_expire,
+    # 申请token
+    username = 'xiangzhe.hou@airliquide.com'
+    password = 'Sunboy27!'
+    user = Cognito(
+        user_pool_id='eu-west-1_XxAZFKMzE',
+        client_id='oppih8pblveb0qb27sl8k9ubc',
+        user_pool_region='eu-west-1',
+        username=username,
+    )
+    user.authenticate(password=password)
+    token = 'Bearer ' + user.id_token.strip()
+
+    # 存入数据库
+    AsyncJob.objects.create(
+        name='IOT_TOKEN',
+        result=token,
+        start_time=time_now,
+        finish_time=time_expire,
         )
     # 返回结果
     h = {
@@ -54,7 +60,7 @@ def get_cognito():
 def multi_thread_task(multi_num, target_task, task_args):
     # 设置多线程数
     multi_num = multi_num
-    to_add_list = task_args
+    to_add_list, h = task_args
     sub_thread_task = []
 
     # 为每个线程分配任务列表
@@ -63,15 +69,14 @@ def multi_thread_task(multi_num, target_task, task_args):
         # 归类序号取余总线程数等于x的元素
         refresh_list = [to_add_list[i] for i in to_add_list_length if i % multi_num == x]
         # 添加至子线程列表
-        sub_thread_task.append(threading.Thread(target=target_task, args=(refresh_list,)))
+        sub_thread_task.append(threading.Thread(target=target_task, args=(refresh_list, h)))
 
     # 循环执行线程列表中的任务
     for task in sub_thread_task:
-        try:
-            task.setDaemon(True)
-            task.start()
-        except Exception as e:
-            print(f"进程创建失败 - {e}")
+        task.start()
+    # 主线程守护子线程
+    for task in sub_thread_task:
+        task.join()
 
 
 class SiteData(View):
@@ -252,18 +257,157 @@ class TagData(View):
         return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
 
     def refresh_main(self):
-        multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=self.assets)
+        h = get_cognito()
+        multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.assets, h))
+
+        # 获取tags后对资产进行分类apsa/bulk
+        self.sort_asset()
+
+        # 更新job状态
         jobs.update('IOT_TAG', 'OK')
 
-    def refresh_sub(self, assets):
-        header = get_cognito()
+    def refresh_sub(self, assets, h):
         for asset in assets:
             url = f'{URL}/assets/{asset.uuid}/tags'
-            res = requests.get(url, headers=header).json()
+            res = requests.get(url, headers=h).json()
             for tag in res['content']:
                 if tag['name'] == 'TECHNO':
-                    tag_name = tag['labels']['name']
+                    tag_name = tag['labels'][0]['name']
+                    break
             if not tag_name:
                 tag_name = 'NULL'
             asset.tags = tag_name
             asset.save()
+
+    def sort_asset(self):
+        apsa_name_list = [
+            'APSA_T3', 'APSA_T4', 'APSA_T5', 'APSA_T6', 'APSA_T7',
+            'APSA_S6', 'APSA_S7', 'APSA_S8', 'MOS', 'EOX', 'PSA',
+        ]
+        apsa_list = []
+        bulk_list = []
+
+        # 过滤ONSITE资产
+        for asset in Asset.objects.filter(tags='ONSITE'):
+            name = asset.name
+            # 筛选出制氮机
+            if name in apsa_name_list:
+                if name.split('_')[0] == 'APSA':
+                    onsite_type = 'APSA'
+                    onsite_series = name.split('_')[1]
+                else:
+                    onsite_type = name
+                    onsite_series = name
+                a = Apsa(
+                    asset=asset,
+                    onsite_type=onsite_type,
+                    onsite_series=onsite_series,
+                )
+                apsa_list.append(a)
+            # 筛选出储罐
+            if 'BULK' in name and 'TOT' not in name:
+                for part in name.split('_'):
+                    if 'M3' in part:
+                        tank_size = part.replace('M3', '')
+                b = Bulk(
+                    asset=asset,
+                    tank_size=tank_size
+                )
+                bulk_list.append(b)
+
+        # 写入数据库
+        Apsa.objects.bulk_create(apsa_list)
+        Bulk.objects.bulk_create(bulk_list)
+
+
+class VariableData(View):
+    def __init__(self):
+        self.assets = []
+
+    def get(self, request):
+        # 检查Job状态
+        if jobs.check('IOT_VARIABLE'):
+            return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
+
+        # 找出需要刷新的资产
+        for a in Asset.objects.filter(tags='ONSITE'):
+            variables_num_iot = a.variables_num
+            variables_num_db = Variable.objects.filter(asset=a).count()
+            # 不满足则添加到更新列表更新
+            if variables_num_iot != variables_num_db:
+                self.assets.append(a)
+
+            # 创建子线程
+        threading.Thread(target=self.refresh_main).start()
+
+        # 返回相应结果
+        return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
+
+    def refresh_main(self):
+        h = get_cognito()
+        multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.assets, h))
+        jobs.update('IOT_VARIABLE', 'OK')
+
+    def refresh_sub(self, assets, h):
+        for asset in assets:
+            url = f'{URL}/assets/{asset.uuid}/variables?limit=1000'
+            res = requests.get(url, headers=h).json()
+
+            # 反序列化
+            variable_iot_dic = {}
+            for content in res['content']:
+                variable_iot_dic[content['id']] = content
+
+            # 计算更新，删除列表
+            variable_old_uuid = [x.uuid for x in Variable.objects.filter(asset=asset)]
+            variable_new_uuid = [j for j in variable_iot_dic.keys() if j not in variable_old_uuid]
+            variable_delete_uuid = [k for k in variable_old_uuid if k not in variable_iot_dic.keys()]
+            variable_update_uuid = [l for l in variable_old_uuid if l in variable_iot_dic.keys()]
+
+            # 新建变量
+            for variable_create in variable_new_uuid:
+                uuid = variable_create
+                name = variable_iot_dic[variable_create]['name']
+                Variable.objects.create(
+                        uuid=uuid,
+                        name=name,
+                        asset=asset,
+                        daily_mark=self.get_daily_mark(name, asset.name)
+                    )
+
+            # 更新变量
+            for variable_update in variable_update_uuid:
+                v = Variable.objects.get(uuid=variable_update)
+                v.name = variable_iot_dic[variable_update]['name']
+                v.save()
+
+            # 删除变量
+            for variable_delete in variable_delete_uuid:
+                v = Variable.objects.get(uuid=variable_delete)
+                v.confirm = -1
+                v.save()
+
+    def get_daily_mark(self, name, asset_name):
+        # Daily标志列表
+        daily_list = [
+            'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
+            'H_STPDFT', 'H_STP400V', 'M3_PEAK',
+        ]
+        daily_mark = ''
+        # 自动匹配Daily标志
+        if name in daily_list:
+            daily_mark = name
+        if name == 'M3PEAK':
+            daily_mark = 'M3_PEAK'
+        if 'M3_PROD' in name:
+            daily_mark = 'M3_PROD'
+        if name == 'M3PEAK' or name == 'PEAKM3':
+            daily_mark = 'M3_PEAK'
+        if name == 'H_STPCUST':
+            daily_mark = 'H_STP400V'
+        if name == 'LEVEL_CC':
+            daily_mark = 'LEVEL'
+        # 检查T系列CUST取消400V
+        if 'T' in asset_name and name == 'H_STPCUST':
+            daily_mark = ''
+        return daily_mark

@@ -54,10 +54,13 @@
                         <a href="#assetMenu" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle">资产信息登记</a>
                         <ul class="collapse list-unstyled" id="assetMenu">
                             <li>
-                                <a href="/assets/page/?is_bulk=0" target="iframe_a">Onsite 资产</a>
+                                <a href="/site/page/" target="iframe_a">气站管理</a>
                             </li>
                             <li>
-                                <a href="/assets/page/?is_bulk=1" target="iframe_a">Bulk 资产</a>
+                                <a href="/apsa/page/" target="iframe_a">Onsite 资产</a>
+                            </li>
+                            <li>
+                                <a href="/bulk/page/" target="iframe_a">Bulk 资产</a>
                             </li>
                         </ul>
                     </li>
@@ -95,9 +98,6 @@
                             <i class="fas fa-align-left"></i>
                             <span>[[ nav_bar ]]</span>
                         </button>
-                        <button type="button" class="btn btn-outline-dark">
-                            <span>上一页</span>
-                        </button>
                         <div class="occ-title">
                             <h2>OCC 在线系统</h2>
                         </div>
@@ -113,14 +113,15 @@
                         </div>
                     </div>
                     <div class="user-info">
-                        <span>
-                            <p>你好,[[user.name]] 用户等级:[[user.level]]</p>
-                        </span>
-                        <span>
-                            <button type="button" class="btn btn-outline-dark" @click="fnQuit">
-                                退出登录
-                            </button>
-                        </span>
+                        <ul>
+                            <li>
+                                <p>你好,[[user.name]] 用户等级:[[user.level]]</p>
+                            </li>
+                            <li style="width: 1px; background-color: #666666"></li>
+                            <li>
+                                <input type="button" @click="fnQuit" value="退出登录">
+                            </li>
+                        </ul>
                     </div>
                 </nav>
                 <iframe name="iframe_a" title="OCC Iframe">

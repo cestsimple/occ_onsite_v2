@@ -4,6 +4,9 @@ from rest_framework_jwt.views import obtain_jwt_token
 from . import views
 
 urlpatterns = [
+    # 主页
+    url(r'^home/$', views.IndexView.as_view(), name='index'),
+
     # Admin用户创建
     url(r'^user/admin/$', views.AdminCreateView.as_view(), name='admin'),
 
@@ -12,6 +15,4 @@ urlpatterns = [
 
     # JWT登录验证
     url(r'^user/auth/$', obtain_jwt_token),
-
-
 ]

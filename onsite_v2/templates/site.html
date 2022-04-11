@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <title>气站管理</title>
+    <link rel="stylesheet" type="text/css" href="{{ static('css/reset.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ static('css/main.css') }}">
+    <script type="text/javascript" src="{{ static('js/vue-2.5.16.js') }}"></script>
+    <script type="text/javascript" src="{{ static('js/axios-0.18.0.min.js') }}"></script>
+</head>
+<body>
+<div id="app">
+    <div class="header_con">
+		<div class="header" v-cloak>
+			<div class="welcome fl">欢迎来到美多商城!</div>
+		</div>
+	</div>
+    <div class="main_con clearfix">
+        <div class="site_top_con">
+            <a @click="show_add_site">新增收货地址</a>
+            <span>你已创建了<b>1</b>个收货地址，最多可创建<b>20</b>个</span>
+        </div>
+        <div class="site_con" v-for="(site, index) in sites">
+            <div class="site_title">
+{#                <div v-if="edit_title_index===index">#}
+{#                    <input v-model="new_title" type="text" name="">#}
+{#                    <input @click="save_title(index)" type="button" name="" value="保 存">#}
+{#                    <input @click="cancel_title(index)" type="reset" name="" value="取 消">#}
+{#                </div>#}
+                <div>
+                    <h3>[[ site.cname ]]</h3>
+                    <a @click="show_edit_title(index)" class="edit_title"></a>
+                </div>
+                <em v-if="">默认地址</em>
+            </div>
+            <ul class="site_list">
+                <li><span>收货人：</span><b>address.receiver</b></li>
+            </ul>
+            <div class="down_btn">
+                <a v-if="" @click="">设为默认</a>
+                <a @click="" class="edit_icon">编辑</a>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript" src="{{ static('js/site.js') }}"></script>
+</body>
+</html>

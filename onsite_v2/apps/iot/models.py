@@ -12,17 +12,10 @@ class AsyncJob(models.Model):
     is_deleted = models.BooleanField(default=False)
 
 
-class Region(models.Model):
-    """地区表"""
-    id = models.AutoField(primary_key=True, verbose_name='数字id')
-    name = models.CharField(max_length=30, verbose_name='地区名', default='')
-    is_deleted = models.BooleanField(default=False)
-
-
 class Engineer(models.Model):
     """维修工程师表"""
     id = models.AutoField(primary_key=True, verbose_name='数字id')
-    region = models.ForeignKey(Region, on_delete='on_delete=models.SET_NULL', null=True, blank=True)
+    region = models.CharField(max_length=30, verbose_name='区域', default='')
     mtgroup = models.CharField(max_length=30, verbose_name='维修分组', default='')
     name = models.CharField(max_length=30, verbose_name='姓名', default='')
     user = models.ForeignKey(User, on_delete='on_delete=models.SET_NULL', null=True, blank=True)
@@ -48,7 +41,6 @@ class Asset(models.Model):
     status = models.CharField(max_length=20, verbose_name='资产状态', default='')
     variables_num = models.IntegerField(default=-1, verbose_name='变量数')
     tags = models.CharField(max_length=100, verbose_name='标签', default='')
-    comment = models.CharField(max_length=50, verbose_name='备注', default='')
     confirm = models.IntegerField(default=0, verbose_name='逻辑删除')
 
 
@@ -63,6 +55,7 @@ class Bulk(models.Model):
     level_c = models.FloatField(max_length=30, verbose_name='filling标志c', default=10)
     level_d = models.FloatField(max_length=30, verbose_name='filling标志d', default=0.5)
     filling_js = models.IntegerField(default=0, verbose_name='计算filling')
+    comment = models.CharField(max_length=50, verbose_name='备注', default='')
 
 
 class Apsa(models.Model):
@@ -80,6 +73,7 @@ class Apsa(models.Model):
     daily_bind = models.CharField(max_length=100, verbose_name='daily绑定资产id', default='')
     flow_meter = models.CharField(max_length=100, verbose_name='流量计变量id', default='')
     cooling_fixed = models.FloatField(max_length=10, verbose_name='cooling设定值', default=0)
+    comment = models.CharField(max_length=50, verbose_name='备注', default='')
 
 
 class Variable(models.Model):

@@ -1,11 +1,15 @@
 import threading
 import requests
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.views import View
 from pycognito import Cognito
-from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk
+from rest_framework.permissions import IsAuthenticated
+from utils.CustomMixins import UpdateListRetrieveViewSet
+from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Engineer
 from datetime import datetime, timedelta
 from utils import jobs
+from .serializer import SiteSerializer, ApsaSerializer, AssetSerializer, BulkSerializer, EngineerSerializer
 
 URL = 'https://bos.iot.airliquide.com/api/v1'
 
@@ -411,3 +415,70 @@ class VariableData(View):
         if 'T' in asset_name and name == 'H_STPCUST':
             daily_mark = ''
         return daily_mark
+
+
+class SiteModelView(UpdateListRetrieveViewSet):
+    """自定义SiteMixinView"""
+    # 查询集
+    queryset = Site.objects.all()
+    # 序列化器
+    serializer_class = SiteSerializer
+    # 权限
+    permission_classes = [IsAuthenticated]
+
+
+class SitePage(View):
+    def get(self, request):
+        return render(request, 'site.html')
+
+
+class ApsaModelView(UpdateListRetrieveViewSet):
+    """自定义ApsaMixinView"""
+    # 查询集
+    queryset = Apsa.objects.all()
+    # 序列化器
+    serializer_class = ApsaSerializer
+    # 权限
+    permission_classes = [IsAuthenticated]
+
+
+class ApsaPage(View):
+    def get(self, request):
+        return render(request, 'apsa.html')
+
+
+class BulkModelView(UpdateListRetrieveViewSet):
+    """自定义BulkMixinView"""
+    # 查询集
+    queryset = Bulk.objects.all()
+    # 序列化器
+    serializer_class = BulkSerializer
+    # 权限
+    permission_classes = [IsAuthenticated]
+
+
+class BulkPage(View):
+    def get(self, request):
+        return render(request, 'bulk.html')
+
+
+class AssetModelView(UpdateListRetrieveViewSet):
+    """自定义AssetMixinView"""
+    # 查询集
+    queryset = Asset.objects.all()
+    # 序列化器
+    serializer_class = AssetSerializer
+    # 权限
+    permission_classes = [IsAuthenticated]
+
+
+class EngineerModelView(UpdateListRetrieveViewSet):
+    """
+    自定义EngineerMixinView
+    """
+    # 查询集
+    queryset = Engineer.objects.all()
+    # 序列化器
+    serializer_class = EngineerSerializer
+    # 权限
+    permission_classes = [IsAuthenticated]

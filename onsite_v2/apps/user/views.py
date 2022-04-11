@@ -4,6 +4,11 @@ from django.views import View
 from .models import User
 
 
+class IndexView(View):
+    def get(self, request):
+        return render(request, 'index.html')
+
+
 class AdminCreateView(View):
     def get(self, request):
         if User.objects.filter(username='admin').count() != 0:

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <title>Onsite资产管理</title>
+    <link rel="stylesheet" type="text/css" href="{{ static('css/reset.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ static('css/main.css') }}">
+    <link rel="stylesheet" type="text/css" href="{{ static('css/bootstrap.min.css') }}">
+    <script type="text/javascript" src="{{ static('js/vue-2.5.16.js') }}"></script>
+    <script type="text/javascript" src="{{ static('js/axios-0.18.0.min.js') }}"></script>
+    <script type="text/javascript" src="{{ static('js/bootstrap.bundle.js') }}"></script>
+</head>
+<body>
+<div id="app">
+    <div class="header_con">
+        <div class="header" v-cloak>
+            <div class="welcome fl">此处搜索过滤排序</div>
+        </div>
+    </div>
+    <div class="main_con clearfix">
+        <table class="table table-hover">
+            <thead>
+            <tr>
+                <th>气站名</th>
+                <th>RTU Name</th>
+                <th>资产名</th>
+                <th>区域</th>
+                <th>维修组别</th>
+                <th>Onsite类型</th>
+                <th>Onsite型号</th>
+                <th>合同产量</th>
+                <th>结算温度</th>
+                <th>资产编号</th>
+                <th>汽化器型号</th>
+                <th>汽化器能力</th>
+                <th>计算daily</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="(item, index) in apsa">
+                <td>abc</td>
+                <td>abc</td>
+                <td>[[item.id]]</td>
+                <td>ALSH</td>
+                <td>a2</td>
+                <td>[[item.onsite_type]]</td>
+                <td>[[item.onsite_series]]</td>
+                <td>[[item.norminal_flow]]</td>
+                <td>[[item.temperature]]</td>
+                <td>[[item.facility_fin]]</td>
+                <td>[[item.vap_type]]</td>
+                <td>[[item.vap_max]]</td>
+                <td>[[item.daily_js]]</td>
+                <td>
+                    <img @click="show_edit_site(index)" src="{{ static('image/edit_icon.jpg') }}"
+                         style="cursor: pointer;width: 20px;height: 20px;">
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="pop_con" v-show="is_show_edit" v-cloak>
+        <div class="site_con site_pop">
+            <div class="site_pop_title">
+                <h3>[[form_site.cname]] - [[form_asset.name]]</h3>
+                <a @click="is_show_edit=false">×</a>
+            </div>
+            <form>
+                <div class="form_group">
+                    <label>*气站英文名:</label>
+                    <input v-model="form_site.ename" type="text" class="receiver">
+                </div>
+                <div class="form_group">
+                    <label>*Onsite设备类型:</label>
+                    <select v-model="form_apsa.onsite_type">
+                        <option value="APSA" selected>APSA</option>
+                        <option value="EOX">EOX</option>
+                        <option value="MOS">MOS</option>
+                        <option value="PSA">PSA</option>
+                    </select>
+                </div>
+                <div class="form_group">
+                    <label>*Onsite设备型号:</label>
+                    <select v-model="form_apsa.onsite_series">
+                        <option value="T3" selected>T3</option>
+                        <option value="T4">T4</option>
+                        <option value="T5">T5</option>
+                        <option value="T6">T6</option>
+                        <option value="T7">T7</option>
+                        <option value="S6">S6</option>
+                        <option value="S7">S7</option>
+                        <option value="S8">S8</option>
+                        <option value="EOX">EOX</option>
+                        <option value="MOS">MOS</option>
+                        <option value="PSA">PSA</option>
+                    </select>
+                </div>
+                <div class="form_group">
+                    <label>*区域：</label>
+                    <select v-model="form_engineer.region">
+                        <option value="ALEC_S_A">ALEC_S_A 华东A</option>
+                        <option value="ALEC_S_B">ALEC_S_B 华东B</option>
+                        <option value="ALJY">ALJY 江阴</option>
+                        <option value="ALYZ">ALYZ 扬州</option>
+                        <option value="ALWH">ALWH 武汉</option>
+                        <option value="ALTJ">ALTJ 天津</option>
+                        <option value="ALSD">ALSD 山东</option>
+                        <option value="ALCD">ALCD 成都</option>
+                        <option value="ALGD">ALGD 广东</option>
+                    </select>
+                </div>
+                <div class="form_group">
+                    <label>*分组-工程师:</label>
+                    <select v-model="form_engineer.mtgroup">
+                        <option v-for="group in mtgroups" :value="group">[[ group ]]</option>
+                    </select>
+                    <select v-model="form_site.engineer">
+                        <option :value="engineer_select.id">[[ engineer_select.name ]]</option>
+                    </select>
+                </div>
+                <div class="form_group">
+                    <label>合同编号：</label>
+                    <input v-model="form_apsa.facility_fin" type="text" class="receiver">
+                </div>
+                <div class="form_group">
+                    <label>*合同产量：</label>
+                    <input v-model="form_apsa.norminal_flow" type="text" class="receiver">
+                </div>
+                <div class="form_group">
+                    <label>汽化器类型：</label>
+                    <input v-model="form_apsa.vap_max" type="text" class="receiver">
+                </div>
+                <div class="form_group">
+                    <label>汽化器最大气化量：</label>
+                    <input v-model="form_apsa.vap_type" type="text" class="receiver">
+                </div>
+                <div class="form_group">
+                    <label>*是否计算Daily：</label>
+                    <select v-model="form_apsa.daily_js">
+                        <option value="1">常规计算</option>
+                        <option value="2">特殊计算</option>
+                        <option value="0">不计算</option>
+                    </select>
+                </div>
+                <div class="form_group" v-show="form_apsa.daily_js==2">
+                    <label>*固定补冷值：</label>
+                    <input v-model="form_apsa.cooling_fixed" type="text" class="receiver">
+                </div>
+                <div class="form_group" v-show="form_apsa.daily_js==2">
+                    <label>*绑定主设备：</label>
+                    <input v-model="form_apsa.daily_bind" type="text" class="receiver" placeholder="Daily计算主设备">
+                </div>
+                <div class="form_group" v-show="form_apsa.daily_js==2">
+                    <label>有流量计：</label>
+                    <input v-model="form_apsa.flow_meter" type="text" class="receiver">
+                </div>
+                <input @click="" type="button" name="" value="新 增" class="info_submit">
+                <input @click="is_show_edit=false" type="reset" name="" value="取 消" class="info_submit info_reset">
+            </form>
+        </div>
+        <div class="mask"></div>
+    </div>
+</div>
+<script type="text/javascript" src="{{ static('js/apsa.js') }}"></script>
+</body>
+</html>

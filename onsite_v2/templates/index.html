@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+    <meta charset="UTF-8">
+    <title>OCC - 在线系统</title>
+    <!-- Bootstrap CSS CDN -->
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/buttons.css">
+    <!-- Native CSS -->
+    <link rel="stylesheet" href="/static/css/index.css">
+    <!-- Font Awesome JS -->
+    <script type="application/javascript" src="/static/js/solid.js" ></script>
+    <script type="application/javascript" src="/static/js/fontawesome.js" ></script>
+    <!-- jQuery CDN - Slim version (=without AJAX) -->
+    <script type="application/javascript" src="/static/js/jquery.min.js" ></script>
+    <!-- Popper.JS -->
+    <script type="application/javascript" src="/static/js/popper.js"></script>
+    <!-- Bootstrap JS -->
+    <script type="application/javascript" src="/static/js/bootstrap.min.js" ></script>
+    <!-- favicon icon -->
+    <link rel="shortcut icon" type="image/png" href="/static/image/favicon.ico"/>
+    <!-- vue -->
+    <script type="application/javascript" src="/static/js/vue-2.5.16.js"></script>
+    <!-- axios -->
+    <script type="application/javascript" src="/static/js/axios-0.18.0.min.js"></script>
+    <!-- native js -->
+    <script  src="/static/js/script.js"></script>
+</head>
+<body>
+    <div>
+        <div class="wrapper" id="app">
+            <!-- Sidebar  -->
+            <nav id="sidebar">
+                <div class="sidebar-header">
+                    <img src="/static/image/logo.png" width="250">
+                </div>
+
+                <ul class="list-unstyled components">
+                    <li>
+                        <a href="#homeSubmenu" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle">报表处理</a>
+                        <ul class="collapse list-unstyled" id="homeSubmenu">
+                            <li>
+                                <a href="/filling/page/" target="iframe_a">充液报表</a>
+                            </li>
+                            <li>
+                                <a href="/daily/page/" target="iframe_a">日报表</a>
+                            </li>
+                            <li>
+                                <a href="/malfunction/page/" target="iframe_a">停机报表</a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <a href="#assetMenu" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle">资产信息登记</a>
+                        <ul class="collapse list-unstyled" id="assetMenu">
+                            <li>
+                                <a href="/assets/page/?is_bulk=0" target="iframe_a">Onsite 资产</a>
+                            </li>
+                            <li>
+                                <a href="/assets/page/?is_bulk=1" target="iframe_a">Bulk 资产</a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <a href="#userMenu" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle">用户管理</a>
+                        <ul class="collapse list-unstyled" id="userMenu">
+                            <li>
+                                <a href="#">信息管理</a>
+                            </li>
+                            <li>
+                                <a href="/user/register/" target="iframe_a">创建删除</a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        <a href="/actions/" target="iframe_a">手动操作</a>
+                    </li>
+                </ul>
+
+                <ul class="list-unstyled CTAs">
+                    <li>
+                        <a href="#" class="download">Download source</a>
+                    </li>
+                    <li>
+                        <a href="#" class="article">Back to article</a>
+                    </li>
+                </ul>
+            </nav>
+
+            <!-- Page Content  -->
+            <div id="content">
+                <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                    <div class="container-fluid">
+                        <button type="button" id="sidebarCollapse" class="btn btn-info"  @click="hide_nav">
+                            <i class="fas fa-align-left"></i>
+                            <span>[[ nav_bar ]]</span>
+                        </button>
+                        <button type="button" class="btn btn-outline-dark">
+                            <span>上一页</span>
+                        </button>
+                        <div class="occ-title">
+                            <h2>OCC 在线系统</h2>
+                        </div>
+                        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                            <ul class="nav navbar-nav ml-auto">
+                                <li class="nav-item active">
+                                    <a class="nav-link" href="https://bos.iot.airliquide.com/hone" target="_blank">IOT</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" href="#">GTIS</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="user-info">
+                        <span>
+                            <p>你好,[[user.name]] 用户等级:[[user.level]]</p>
+                        </span>
+                        <span>
+                            <button type="button" class="btn btn-outline-dark" @click="fnQuit">
+                                退出登录
+                            </button>
+                        </span>
+                    </div>
+                </nav>
+                <iframe name="iframe_a" title="OCC Iframe">
+
+                </iframe>
+            </div>
+        </div>
+    </div>
+    <script type="application/javascript" src="/static/js/common.js"></script>
+    <script type="application/javascript" src="/static/js/index.js"></script>
+</body>
+<style>
+    body {
+        background-color: rgb(248, 248, 248);
+    }
+
+    .wrapper {
+        height: 1000px;
+    }
+
+    iframe {
+        height: 90%;
+        width: 100%;
+        border: 0;
+        background-color: #FFFFFF;
+    }
+</style>
+</html>

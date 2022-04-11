@@ -5,6 +5,22 @@ let vm = new Vue({
         is_show_edit: false,
         form_apsa: {
             id: 0,
+            asset:{
+                confirm: 0,
+                id: 0,
+                name: '',
+                site:{
+                    id: 0,
+                    cname: '',
+                    ename: '',
+                    engineer: {
+                        id: 0,
+                        region: '',
+                        mtgroup: '',
+                        name: '',
+                    }
+                }
+            },
             onsite_type: '',
             onsite_series: '',
             facility_fin: '',
@@ -18,30 +34,6 @@ let vm = new Vue({
             cooling_fixed: 0,
             comment: '',
             asset: 0,
-        },
-        form_site: {
-            id: 0,
-            uuid: '',
-            cname: '',
-            ename: '',
-            region: '',
-            engineer: 0,
-            confirm: 0,
-        },
-        form_asset: {
-            id: 0,
-            name: '',
-            site: 0,
-            confirm: 0,
-        },
-        mtgroups: ['A_1', 'A_2', 'A_3', 'B_1'],
-        engineer_select: {'id':1, 'name':'王文三'},
-        form_engineer: {
-            id: '',
-            region: '',
-            mtgroup: '',
-            name: '',
-            is_deleted: '',
         },
         form_variables: [],
 
@@ -61,14 +53,12 @@ let vm = new Vue({
         show_edit_site(index){
             this.is_show_edit = true;
             // 只获取要编辑的数据
-            this.form_apsa =JSON.parse(JSON.stringify(this.apsa[index]))
-            this.get_asset(this.form_apsa.asset)
-            this.get_site(this.form_asset.site)
+            this.form_apsa = JSON.parse(JSON.stringify(this.apsa[index]))
+            console.log(this.form_apsa)
         },
         // 获取apsa数据
         get_apsa(){
             let url = '/apsa/';
-
             axios.get(url, {
                 responseType: 'json',
                  headers: {
@@ -76,7 +66,8 @@ let vm = new Vue({
                     }
             })
                 .then(response => {
-                    this.apsa = response.data;
+                    this.apsa = JSON.parse(JSON.stringify(response.data));
+                    console.log(this.apsa)
                 })
                 .catch(error => {
                     console.log(error.response.data)
@@ -87,42 +78,7 @@ let vm = new Vue({
                     console.log(error.response);
                     this.assets = [];
                 })
-        },
-        get_site(pk){
-            let url = '/site/' + pk + '/'
-            axios.get(url, {
-                responseType: 'json',
-                 headers: {
-                        'authorization': 'JWT ' + localStorage.token
-                    }
-            })
-                .then(response => {
-                    this.form_site = response.data;
-                })
-        },
-        get_asset(pk){
-            let url = '/asset/' + pk + '/'
-            axios.get(url, {
-                responseType: 'json',
-                 headers: {
-                        'authorization': 'JWT ' + localStorage.token
-                    }
-            })
-                .then(response => {
-                    this.form_asset = response.data;
-                })
-        },
-        get_engineer(pk){
-            let url = '/engineer/' + pk + '/'
-            axios.get(url, {
-                responseType: 'json',
-                 headers: {
-                        'authorization': 'JWT ' + localStorage.token
-                    }
-            })
-                .then(response => {
-                    this.form_engineer = response.data;
-                })
+
         },
         // 新增地址
         save_asset(){

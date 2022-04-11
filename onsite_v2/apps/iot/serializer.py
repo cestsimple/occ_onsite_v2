@@ -4,20 +4,41 @@ from rest_framework.serializers import ModelSerializer
 from .models import Site, Apsa, Bulk, Variable, Asset, Engineer
 
 
+class EngineerSerializer(ModelSerializer):
+    """
+    Enginee序列化器
+    """
+
+    class Meta:
+        model = Engineer
+        exclude = ('user', 'is_deleted',)
+
+
 class SiteSerializer(ModelSerializer):
     """
     Site序列化器
     """
+    engineer = EngineerSerializer()
     class Meta:
         model = Site
-        fields = '__all__'
+        exclude = ('uuid',)
+
+
+class AssetSerializer(ModelSerializer):
+    """
+    Asset序列化器
+    """
+    site = SiteSerializer()
+    class Meta:
+        model = Asset
+        exclude = ('uuid', 'status', 'tags', 'variables_num')
 
 
 class ApsaSerializer(ModelSerializer):
     """
     APSA序列化器
     """
-
+    asset = AssetSerializer()
 
     class Meta:
         model = Apsa
@@ -52,21 +73,3 @@ class BulkSerializer(ModelSerializer):
         model = Bulk
         fields = '__all__'
 
-
-class AssetSerializer(ModelSerializer):
-    """
-    Asset序列化器
-    """
-    class Meta:
-        model = Asset
-        exclude = ('uuid', 'status', 'tags', 'variables_num')
-
-
-class EngineerSerializer(ModelSerializer):
-    """
-    Enginee序列化器
-    """
-
-    class Meta:
-        model = Engineer
-        exclude = ('uuid', 'status', 'tags', 'variables_num')

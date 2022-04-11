@@ -39,11 +39,11 @@
             </thead>
             <tbody>
             <tr v-for="(item, index) in apsa">
-                <td>abc</td>
-                <td>abc</td>
-                <td>[[item.id]]</td>
-                <td>ALSH</td>
-                <td>a2</td>
+                <td>[[item.asset.site.cname]]</td>
+                <td>[[item.asset.site.ename]]</td>
+                <td>[[item.asset.name]]</td>
+                <td>[[item.asset.site.engineer]]</td>
+                <td>[[item.asset.site.engineer]]</td>
                 <td>[[item.onsite_type]]</td>
                 <td>[[item.onsite_series]]</td>
                 <td>[[item.norminal_flow]]</td>
@@ -63,13 +63,13 @@
     <div class="pop_con" v-show="is_show_edit" v-cloak>
         <div class="site_con site_pop">
             <div class="site_pop_title">
-                <h3>[[form_site.cname]] - [[form_asset.name]]</h3>
+                <h3>[[form_apsa.asset.site.cname]] - [[form_apsa.asset.name]]</h3>
                 <a @click="is_show_edit=false">×</a>
             </div>
             <form>
                 <div class="form_group">
-                    <label>*气站英文名:</label>
-                    <input v-model="form_site.ename" type="text" class="receiver">
+                    <label>*RTU名:</label>
+                    <input v-model="form_apsa.asset.site.ename" type="text" class="receiver">
                 </div>
                 <div class="form_group">
                     <label>*Onsite设备类型:</label>

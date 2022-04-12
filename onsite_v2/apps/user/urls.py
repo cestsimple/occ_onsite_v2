@@ -15,4 +15,7 @@ urlpatterns = [
 
     # JWT登录验证
     url(r'^user/auth/$', obtain_jwt_token),
+
+    url(r'^index/$',views.Index2View.as_view()),
+    url(r'^login/$',views.Login2View.as_view())
 ]

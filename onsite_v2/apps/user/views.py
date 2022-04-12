@@ -31,3 +31,13 @@ class AdminCreateView(View):
 class LoginView(View):
     def get(self, request):
         return render(request, 'login.html')
+
+
+class Index2View(View):
+    def get(self, request):
+        return render(request, 'index_2.html')
+
+
+class Login2View(View):
+    def get(self, request):
+        return render(request, 'login_2.html')

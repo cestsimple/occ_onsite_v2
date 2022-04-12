@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://unpkg.com/vue@next"></script>
+    <!-- import CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+    <!-- import JavaScript -->
+    <script src="https://unpkg.com/element-plus"></script>
+{#    <script type="text/javascript" src="{{ static('js/vue-2.5.16.js') }}"></script>#}
+{#    <script type="text/javascript" src="{{ static('js/element-ui.js') }}"></script>#}
+    <link rel="stylesheet" type="text/css" href="{{ static('css/login.css') }}">
+
+</head>
+<body>
+<div id="app">
+    <!-- 主体容器 -->
+    <div class="login-container">
+         <!-- 登录框 -->
+        <div class="login-box">
+             <!-- logo -->
+            <div class="img-box">
+                <img src="/static/image/logo-round.jpg" alt="Air Liquid">
+            </div>
+             <!-- 信息表单 -->
+            <div class="login-form">
+                <el-form ref="loginFormRef" label-width="80px">
+                     <!-- user -->
+                    <el-form-item label="用户名：">
+                      <el-input v-model="loginForm.username" />
+                    </el-form-item>
+                     <!-- password -->
+                    <el-form-item label="密码：">
+                      <el-input v-model="loginForm.password" type="password"/>
+                    </el-form-item>
+                     <!-- button -->
+                    <el-form-item class="btns">
+                        <el-button type="primary">登录</el-button>
+                        <el-button type="info" @click="fnClear">重置</el-button>
+                    </el-form-item>
+                </el-form>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+<script>
+    const App = {
+        delimiters: ['[[', ']]'],
+        data() {
+            return {
+                loginForm: {
+                    username: '',
+                    password: '',
+                },
+            };
+        },
+        methods: {
+            fnLogin(){
+                axios.post("/user/auth/", this.loginForm)
+                    .then(function (response){
+                        sessionStorage.clear();
+                        localStorage.clear();
+                        localStorage.token = response.data.token;
+                        localStorage.username = response.data.username;
+                        localStorage.userid = response.data.id;
+                        localStorage.level = response.data.level;
+                        window.location.href = '/home/';
+                    })
+                    .catch(function (error){
+                        alert('密码错误')
+                    })
+            },
+            fnClear(){
+                this.loginForm = {
+                    username: '',
+                    password: '',
+                };
+            }
+        }
+    };
+    const app = Vue.createApp(App);
+    app.use(ElementPlus);
+    app.mount("#app");
+</script>
+</html>

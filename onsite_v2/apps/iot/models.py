@@ -27,6 +27,7 @@ class Site(models.Model):
     id = models.AutoField(primary_key=True, verbose_name='资产数字id')
     uuid = models.CharField(max_length=100, verbose_name='资产UUID')
     cname = models.CharField(max_length=50, verbose_name='气站中文名')
+    # rtu名
     ename = models.CharField(max_length=50, verbose_name='气站英文名', null=True, blank=True)
     engineer = models.ForeignKey(Engineer, on_delete=models.SET_NULL, null=True, blank=True)
     confirm = models.IntegerField(default=0)
@@ -36,7 +37,8 @@ class Asset(models.Model):
     """资产表"""
     id = models.AutoField(primary_key=True, verbose_name='资产数字id')
     uuid = models.CharField(max_length=100, verbose_name='资产UUID')
-    name = models.CharField(max_length=50, verbose_name='资产名')
+    cname = models.CharField(max_length=50, verbose_name='资产名')
+    # name = models.CharField(max_length=50, verbose_name='RTU名')
     site = models.ForeignKey(Site, on_delete='on_delete=models.SET_NULL', null=True, blank=True)
     status = models.CharField(max_length=20, verbose_name='资产状态', default='')
     variables_num = models.IntegerField(default=-1, verbose_name='变量数')

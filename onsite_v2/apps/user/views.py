@@ -59,16 +59,18 @@ class UserView(ModelViewSet):
         email = request.data.get('email')
 
         try:
-            user = User.objects.get(id=pk)
+            user = User.objects.get(id=int(pk))
             user.username = username
             user.first_name = first_name
-            user.is_staff = is_staff
+            if is_staff:
+                user.is_staff = is_staff
             user.level = level
             user.region = region
             user.group = group
             user.email = email
-            user.save
-        except DatabaseError:
+            user.save()
+        except DatabaseError as e:
+            print(e)
             return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'status': 200, 'msg': '保存成功'})

@@ -1,15 +1,18 @@
 import threading
 import requests
 from django.http import JsonResponse
-from django.shortcuts import render
 from django.views import View
 from pycognito import Cognito
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
 from utils.CustomMixins import UpdateListRetrieveViewSet
-from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Engineer
+from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk
 from datetime import datetime, timedelta
 from utils import jobs
-from .serializer import SiteSerializer, ApsaSerializer, AssetSerializer, BulkSerializer, EngineerSerializer
+from .serializer import SiteSerializer, ApsaSerializer, BulkSerializer, VariableSerializer
+from ..user.models import User
+from django.db.models import Q
 
 URL = 'https://bos.iot.airliquide.com/api/v1'
 
@@ -125,8 +128,7 @@ class SiteData(View):
             list_create.append(
                 Site(
                     uuid=new_site,
-                    cname=sites_iot_dic[new_site]['name'],
-                    ename='',
+                    name=sites_iot_dic[new_site]['name'],
                 )
             )
 
@@ -134,7 +136,7 @@ class SiteData(View):
         list_update = []
         for update_site in site_update_uuid:
             site = Site.objects.get(uuid=update_site)
-            site.cname = sites_iot_dic[update_site]['name']
+            site.name = sites_iot_dic[update_site]['name']
             list_update.append(site)
 
         # 删除site
@@ -146,7 +148,7 @@ class SiteData(View):
         # 批量写入数据库
         try:
             Site.objects.bulk_create(list_create)
-            Site.objects.bulk_update(list_update, fields=['cname'])
+            Site.objects.bulk_update(list_update, fields=['name'])
         except Exception as e:
             print(e)
             jobs.update('IOT_SITE', e)
@@ -201,6 +203,7 @@ class AssetData(View):
                 Asset(
                     uuid=new_asset,
                     name=assets_iot_dic[new_asset]['name'],
+                    rtu_name='',
                     site=site,
                     status=assets_iot_dic[new_asset]['status']['name'],
                     variables_num = assets_iot_dic[new_asset]['totalVariables'],
@@ -267,6 +270,9 @@ class TagData(View):
         # 获取tags后对资产进行分类apsa/bulk
         self.sort_asset()
 
+        # 更新site工程师
+        self.engineer_main()
+
         # 更新job状态
         jobs.update('IOT_TAG', 'OK')
 
@@ -310,18 +316,54 @@ class TagData(View):
                 apsa_list.append(a)
             # 筛选出储罐
             if 'BULK' in name and 'TOT' not in name:
-                for part in name.split('_'):
-                    if 'M3' in part:
-                        tank_size = part.replace('M3', '')
                 b = Bulk(
                     asset=asset,
-                    tank_size=tank_size
                 )
                 bulk_list.append(b)
 
         # 写入数据库
         Apsa.objects.bulk_create(apsa_list)
         Bulk.objects.bulk_create(bulk_list)
+
+    def engineer_main(self):
+        """根据onsite tag获取site的工程师"""
+        sites_obj = Site.objects.filter(id__in=[
+            x.site_id for x in Asset.objects.filter(tags='ONSITE')
+        ]).distinct()
+        h = get_cognito()
+        multi_thread_task(multi_num=10, target_task=self.engineer_sub, task_args=(sites_obj, h))
+
+    def engineer_sub(self, sites, h):
+        for site in sites:
+            url = f'{URL}/sites/{site.uuid}/tags'
+            res = requests.get(url, headers=h).json()
+
+            for tag in res['content']:
+                if tag['name'] != 'PHASE' and tag['name'] != 'BUSINESS_LINE':
+                    try:
+                        tag_content = tag['labels'][0]['name']
+                    except IndexError:
+                        print(f'错误！  {url}')
+                        tag_content = ''
+                    break
+
+            engineer_name = self.get_engineer_name(tag_content)
+            print(engineer_name)
+            engineer = User.objects.filter(first_name=engineer_name)
+            if engineer.count() == 1:
+                site.engineer = engineer[0]
+                site.save()
+
+    def get_engineer_name(self, name):
+        name = name.replace(' ', '')
+        if len(name) > 12:
+            if name[-12] == '0':
+                return name[:-12]
+            else:
+                return name[:-11]
+        if name == '维修公用机':
+            name = '何祥文'
+        return name
 
 
 class VariableData(View):
@@ -420,16 +462,25 @@ class VariableData(View):
 class SiteModelView(UpdateListRetrieveViewSet):
     """自定义SiteMixinView"""
     # 查询集
-    queryset = Site.objects.all()
+    queryset = Site.objects.filter(asset__tags='ONSITE').distinct()
     # 序列化器
     serializer_class = SiteSerializer
     # 权限
     permission_classes = [IsAuthenticated]
 
+    def search(self, request):
+        query_params = request.GET
+        apsa = query_params.get('apsa')
 
-class SitePage(View):
-    def get(self, request):
-        return render(request, 'site.html')
+        query = self.queryset
+
+        if apsa:
+            site_id = Apsa.objects.get(id=apsa).asset.site.id
+            query = query.get(id=site_id)
+
+        ser = self.get_serializer(query)
+
+        return Response(ser.data)
 
 
 class ApsaModelView(UpdateListRetrieveViewSet):
@@ -441,10 +492,14 @@ class ApsaModelView(UpdateListRetrieveViewSet):
     # 权限
     permission_classes = [IsAuthenticated]
 
-
-class ApsaPage(View):
-    def get(self, request):
-        return render(request, 'apsa.html')
+    def update(self, request, pk):
+        username = request.data.get('username')
+        first_name = request.data.get('first_name')
+        is_staff = request.data.get('is_staff')
+        level = request.data.get('level')
+        region = request.data.get('region')
+        group = request.data.get('group')
+        email = request.data.get('email')
 
 
 class BulkModelView(UpdateListRetrieveViewSet):
@@ -457,28 +512,24 @@ class BulkModelView(UpdateListRetrieveViewSet):
     permission_classes = [IsAuthenticated]
 
 
-class BulkPage(View):
-    def get(self, request):
-        return render(request, 'bulk.html')
-
-
-class AssetModelView(UpdateListRetrieveViewSet):
+class VariableModelView(UpdateListRetrieveViewSet):
     """自定义AssetMixinView"""
     # 查询集
-    queryset = Asset.objects.all()
+    queryset = Variable.objects.filter(asset__tags='ONSITE').filter(~Q(daily_mark=''))
     # 序列化器
-    serializer_class = AssetSerializer
+    serializer_class = VariableSerializer
     # 权限
     permission_classes = [IsAuthenticated]
 
+    def search(self, request):
+        query_params = request.GET
+        apsa = query_params.get('apsa')
 
-class EngineerModelView(UpdateListRetrieveViewSet):
-    """
-    自定义EngineerMixinView
-    """
-    # 查询集
-    queryset = Engineer.objects.all()
-    # 序列化器
-    serializer_class = EngineerSerializer
-    # 权限
-    permission_classes = [IsAuthenticated]
+        query = self.queryset
+
+        if apsa:
+            query = query.filter(asset__apsa__id=apsa)
+
+        ser = self.get_serializer(query, many=True)
+
+        return Response(ser.data)

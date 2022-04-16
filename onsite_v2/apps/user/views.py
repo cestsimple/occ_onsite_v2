@@ -1,4 +1,5 @@
 from django.db import DatabaseError
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views import View
@@ -6,10 +7,9 @@ from rest_framework import status
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-
-from utils.CustomMixins import UpdateListRetrieveViewSet
 from .models import User
 from .serializer import UserSerializer
+from ..iot.models import Apsa
 
 
 class IndexView(View):
@@ -49,26 +49,52 @@ class UserView(ModelViewSet):
     # 权限
     permission_classes = [IsAdminUser]
 
+    def search(self, request):
+        query_params = request.GET
+        engineer = query_params.get('engineer')
+
+        query = self.queryset
+
+        if engineer:
+            query = query.filter(~Q(group=''))
+
+        ser = self.get_serializer(query, many=True)
+
+        return Response(ser.data)
+
     def update(self, request, pk):
-        username = request.data.get('username')
-        first_name = request.data.get('first_name')
-        is_staff = request.data.get('is_staff')
-        level = request.data.get('level')
-        region = request.data.get('region')
-        group = request.data.get('group')
-        email = request.data.get('email')
+        rtu_name = request.data.get('rtu_name')
+        engineer = request.data.get('engineer')
+        onsite_type = request.data.get('onsite_type')
+        onsite_series = request.data.get('onsite_series')
+        facility_fin = request.data.get('facility_fin')
+        daily_js = request.data.get('daily_js')
+        temperature = request.data.get('temperature')
+        vap_max = request.data.get('vap_max')
+        vap_type = request.data.get('vap_type')
+        norminal_flow = request.data.get('norminal_flow')
+        daily_bind = request.data.get('daily_bind')
+        flow_meter = request.data.get('flow_meter')
+        cooling_fixed = request.data.get('cooling_fixed')
+        comment = request.data.get('comment')
 
         try:
-            user = User.objects.get(id=int(pk))
-            user.username = username
-            user.first_name = first_name
-            if is_staff:
-                user.is_staff = is_staff
-            user.level = level
-            user.region = region
-            user.group = group
-            user.email = email
-            user.save()
+            apsa = Apsa.objects.get(id=int(pk))
+            apsa.asset.rtu_name = rtu_name
+            apsa.asset.site.engineer = engineer['id']
+            apsa.onsite_type = onsite_type
+            apsa.onsite_series = onsite_series
+            apsa.facility_fin = facility_fin
+            apsa.daily_js = daily_js
+            apsa.temperature = temperature
+            apsa.vap_max = vap_max
+            apsa.vap_type = vap_type
+            apsa.norminal_flow = norminal_flow
+            apsa.daily_bind = daily_bind
+            apsa.flow_meter = flow_meter
+            apsa.cooling_fixed = cooling_fixed
+            apsa.comment = comment
+            apsa.save()
         except DatabaseError as e:
             print(e)
             return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)

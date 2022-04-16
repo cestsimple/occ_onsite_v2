@@ -12,24 +12,12 @@ class AsyncJob(models.Model):
     is_deleted = models.BooleanField(default=False)
 
 
-class Engineer(models.Model):
-    """维修工程师表"""
-    id = models.AutoField(primary_key=True, verbose_name='数字id')
-    region = models.CharField(max_length=30, verbose_name='区域', default='')
-    mtgroup = models.CharField(max_length=30, verbose_name='维修分组', default='')
-    name = models.CharField(max_length=30, verbose_name='姓名', default='')
-    user = models.ForeignKey(User, on_delete='on_delete=models.SET_NULL', null=True, blank=True)
-    is_deleted = models.BooleanField(default=False)
-
-
 class Site(models.Model):
     """气站表"""
     id = models.AutoField(primary_key=True, verbose_name='资产数字id')
     uuid = models.CharField(max_length=100, verbose_name='资产UUID')
-    cname = models.CharField(max_length=50, verbose_name='气站中文名')
-    # rtu名
-    ename = models.CharField(max_length=50, verbose_name='气站英文名', null=True, blank=True)
-    engineer = models.ForeignKey(Engineer, on_delete=models.SET_NULL, null=True, blank=True)
+    name = models.CharField(max_length=50, verbose_name='气站中文名')
+    engineer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     confirm = models.IntegerField(default=0)
 
 
@@ -37,8 +25,8 @@ class Asset(models.Model):
     """资产表"""
     id = models.AutoField(primary_key=True, verbose_name='资产数字id')
     uuid = models.CharField(max_length=100, verbose_name='资产UUID')
-    cname = models.CharField(max_length=50, verbose_name='资产名')
-    # name = models.CharField(max_length=50, verbose_name='RTU名')
+    name = models.CharField(max_length=50, verbose_name='资产名')
+    rtu_name = models.CharField(max_length=50, verbose_name='RTU名')
     site = models.ForeignKey(Site, on_delete='on_delete=models.SET_NULL', null=True, blank=True)
     status = models.CharField(max_length=20, verbose_name='资产状态', default='')
     variables_num = models.IntegerField(default=-1, verbose_name='变量数')
@@ -85,4 +73,4 @@ class Variable(models.Model):
     name = models.CharField(max_length=50, verbose_name='变量名')
     asset = models.ForeignKey(Asset, on_delete='CASCADE', max_length=100, verbose_name='变量资产')
     confirm = models.IntegerField(default=0, verbose_name='逻辑删除')
-    daily_mark = models.CharField(max_length=50, verbose_name='M3标志', default='')
+    daily_mark = models.CharField(max_length=50, verbose_name='M3标志', default='', blank=True)

@@ -20,6 +20,9 @@ class Site(models.Model):
     engineer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     confirm = models.IntegerField(default=0)
 
+    class Meta:
+        ordering = ['id']
+
 
 class Asset(models.Model):
     """资产表"""
@@ -32,6 +35,9 @@ class Asset(models.Model):
     variables_num = models.IntegerField(default=-1, verbose_name='变量数')
     tags = models.CharField(max_length=100, verbose_name='标签', default='')
     confirm = models.IntegerField(default=0, verbose_name='逻辑删除')
+
+    class Meta:
+        ordering = ['id']
 
 
 class Bulk(models.Model):
@@ -46,6 +52,9 @@ class Bulk(models.Model):
     level_d = models.FloatField(max_length=30, verbose_name='filling标志d', default=0.5)
     filling_js = models.IntegerField(default=0, verbose_name='计算filling')
     comment = models.CharField(max_length=50, verbose_name='备注', default='')
+
+    class Meta:
+        ordering = ['id']
 
 
 class Apsa(models.Model):
@@ -65,6 +74,9 @@ class Apsa(models.Model):
     cooling_fixed = models.FloatField(max_length=10, verbose_name='cooling设定值', default=0)
     comment = models.CharField(max_length=50, verbose_name='备注', default='')
 
+    class Meta:
+        ordering = ['id']
+
 
 class Variable(models.Model):
     """变量信息表"""
@@ -74,3 +86,6 @@ class Variable(models.Model):
     asset = models.ForeignKey(Asset, on_delete='CASCADE', max_length=100, verbose_name='变量资产')
     confirm = models.IntegerField(default=0, verbose_name='逻辑删除')
     daily_mark = models.CharField(max_length=50, verbose_name='M3标志', default='', blank=True)
+
+    class Meta:
+        ordering = ['id']

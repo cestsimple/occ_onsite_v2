@@ -21,5 +21,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     url(r'^', include(('apps.iot.urls', 'iot'), namespace='iot')),
     url(r'^', include(('apps.user.urls', 'users'), namespace='users')),
-    #url(r'^', include(('apps.onsite.urls', 'onsite'), namespace='onsite')),
+    url(r'^', include(('apps.onsite.urls', 'onsite'), namespace='onsite')),
 ]

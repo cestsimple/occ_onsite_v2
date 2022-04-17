@@ -66,8 +66,6 @@ class UserView(ModelViewSet):
 
         return Response(ser.data)
 
-
-
     def update(self, request, pk):
         username = request.data.get('username')
         first_name = request.data.get('first_name')
@@ -81,7 +79,7 @@ class UserView(ModelViewSet):
             user = User.objects.get(id=pk)
             user.username = username
             user.first_name = first_name
-            if is_staff:
+            if is_staff is not None:
                 user.is_staff = is_staff
             user.level = level
             user.region = region

@@ -474,11 +474,16 @@ class SiteModelView(UpdateListRetrieveViewSet):
     def search(self, request):
         query_params = request.GET
         apsa = query_params.get('apsa')
+        bulk = query_params.get('bulk')
 
         query = self.queryset
 
         if apsa:
             site_id = Apsa.objects.get(id=apsa).asset.site.id
+            query = query.get(id=site_id)
+
+        if bulk:
+            site_id = Bulk.objects.get(id=bulk).asset.site.id
             query = query.get(id=site_id)
 
         ser = self.get_serializer(query)
@@ -545,6 +550,37 @@ class BulkModelView(UpdateListRetrieveViewSet):
     serializer_class = BulkSerializer
     # 权限
     permission_classes = [IsAuthenticated]
+    # 分页器
+    pagination_class = PageNum
+
+    def update(self, request, pk):
+        tank_size = request.data.get('tank_size')
+        tank_func = request.data.get('tank_func')
+        level_a = request.data.get('level_a')
+        level_b = request.data.get('level_b')
+        level_c = request.data.get('level_c')
+        level_d = request.data.get('level_d')
+        filling_js = request.data.get('filling_js')
+        comment = request.data.get('comment')
+
+        try:
+            bulk = Bulk.objects.get(id=int(pk))
+            if tank_size:
+                bulk.tank_size = tank_size
+            if tank_func:
+                bulk.tank_func = tank_func
+            bulk.level_a = level_a
+            bulk.level_b = level_b
+            bulk.level_c = level_c
+            bulk.level_d = level_d
+            bulk.filling_js = filling_js
+            bulk.comment = comment
+            bulk.save()
+        except DatabaseError as e:
+            print(e)
+            return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'status': 200, 'msg': '保存成功'})
 
 
 class VariableModelView(UpdateListRetrieveViewSet):
@@ -559,11 +595,15 @@ class VariableModelView(UpdateListRetrieveViewSet):
     def search(self, request):
         query_params = request.GET
         apsa = query_params.get('apsa')
+        bulk = query_params.get('bulk')
 
         query = self.queryset
 
         if apsa:
             query = query.filter(asset__apsa__id=apsa)
+
+        if bulk:
+            query = query.filter(asset__bulk__id=bulk)
 
         ser = self.get_serializer(query, many=True)
 

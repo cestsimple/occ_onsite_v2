@@ -39,8 +39,6 @@ class ApsaSerializer(ModelSerializer):
     """
     engineer = serializers.SerializerMethodField()
     rtu_name = serializers.SerializerMethodField()
-    # region = serializers.SerializerMethodField()
-    # group = serializers.SerializerMethodField()
     site_name = serializers.SerializerMethodField()
 
     def get_rtu_name(self, obj):
@@ -58,15 +56,6 @@ class ApsaSerializer(ModelSerializer):
             res['group'] = obj.asset.site.engineer.group
             return res
         return res
-        # def get_region(self, obj):
-        #     if obj.asset.site.engineer is not None:
-        #         return obj.asset.site.engineer.region
-        #     return ''
-        #
-        # def get_group(self, obj):
-        #     if obj.asset.site.engineer is not None:
-        #         return obj.asset.site.engineer.group
-        return ''
 
     def get_site_name(self, obj):
         return obj.asset.site.name
@@ -101,23 +90,25 @@ class BulkSerializer(ModelSerializer):
     Bulk序列化器
     """
 
+    engineer = serializers.SerializerMethodField()
     rtu_name = serializers.SerializerMethodField()
-    region = serializers.SerializerMethodField()
-    group = serializers.SerializerMethodField()
     site_name = serializers.SerializerMethodField()
 
     def get_rtu_name(self, obj):
         return obj.asset.rtu_name
 
-    def get_region(self, obj):
+    def get_engineer(self, obj):
+        res = {
+            'id': '',
+            'region': '',
+            'group': '',
+        }
         if obj.asset.site.engineer is not None:
-            return obj.asset.site.engineer.region
-        return ''
-
-    def get_group(self, obj):
-        if obj.asset.site.engineer is not None:
-            return obj.asset.site.engineer.group
-        return ''
+            res['id'] = obj.asset.site.engineer.id
+            res['region'] = obj.asset.site.engineer.region
+            res['group'] = obj.asset.site.engineer.group
+            return res
+        return res
 
     def get_site_name(self, obj):
         return obj.asset.site.name

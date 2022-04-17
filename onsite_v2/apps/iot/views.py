@@ -1,6 +1,5 @@
 import threading
 import time
-
 import requests
 from django.db import DatabaseError
 from django.http import JsonResponse
@@ -9,7 +8,6 @@ from pycognito import Cognito
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
 from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record

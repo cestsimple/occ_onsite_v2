@@ -1,4 +1,6 @@
 import threading
+import time
+
 import requests
 from django.db import DatabaseError
 from django.http import JsonResponse
@@ -10,7 +12,7 @@ from rest_framework.response import Response
 
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
-from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk
+from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record
 from datetime import datetime, timedelta
 from utils import jobs
 from .serializer import SiteSerializer, ApsaSerializer, BulkSerializer, VariableSerializer
@@ -460,6 +462,70 @@ class VariableData(View):
         if 'T' in asset_name and name == 'H_STPCUST':
             daily_mark = ''
         return daily_mark
+
+
+class RecordData(View):
+    def __init__(self):
+        self.variables = []
+
+    def get(self, request):
+        # 检查Job状态
+        if jobs.check('IOT_RECORD'):
+            return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
+
+        # 创建子线程
+        threading.Thread(target=self.refresh_main).start()
+
+        # 返回相应结果
+        return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
+
+    def refresh_main(self):
+        h = get_cognito()
+        # 获取apsa对应变量
+        self.variables = [x for x in Variable.objects.filter(asset__apsa__daily_js__gte=1).filter(~Q(daily_mark=''))]
+        # 获取bulk对应变量
+        self.variables += [j for j in Variable.objects.filter(asset__bulk__filling_js__gte=1).filter(~Q(daily_mark=''))]
+        # 分发任务至子线程
+        multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.variables, h))
+        # 更新job状态
+        jobs.update('IOT_RECORD', 'OK')
+
+    def refresh_sub(self, variables, h):
+        for variable in variables:
+            # 设定查询时间
+            t = datetime.now()
+            # IOT系统时间未UTC，会把我们的时间+8返回
+            t_end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T17:00:00.000Z'
+            t_start = (t + timedelta(days=-2)).strftime("%Y-%m-%d") + 'T15:00:00.000Z'
+            max_num = 5000
+            url = f'{URL}/assets/{variable.asset.uuid}/variables/{variable.uuid}/' \
+                  f'timeseries?start={t_start}&end={t_end}&limit={max_num}'
+
+            res = requests.get(url, headers=h).json()['timeseries']
+
+            daily_mark_list = [
+                'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
+                'H_STPDFT', 'H_STP400V', 'M3_PEAK',
+            ]
+            for i in res.keys():
+                time_array = time.localtime(int(i[:-3]))
+                t = time.strftime("%Y-%m-%d %H:%M", time_array)
+                # 过滤
+                value = res[i]
+                if variable.daily_mark == 'LEVEL' and not t.endswith('0'):
+                    # 若是level，不要15分钟的点
+                    pass
+                elif variable.daily_mark in daily_mark_list and not t.endswith('00:00'):
+                    # 若是M3_PEAK，只要零点的
+                    pass
+                else:
+                    Record.objects.update_or_create(
+                        variable=variable, time=t,
+                        defaults={
+                            'time': t,
+                            'value': value,
+                        }
+                    )
 
 
 class SiteModelView(UpdateListRetrieveViewSet):

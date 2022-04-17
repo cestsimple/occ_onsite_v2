@@ -89,3 +89,12 @@ class Variable(models.Model):
 
     class Meta:
         ordering = ['id']
+
+
+class Record(models.Model):
+    """变量记录表"""
+    id = models.AutoField(primary_key=True)
+    variable = models.ForeignKey(Variable, on_delete='CASCADE', max_length=100, verbose_name='记录所属变量')
+    time = models.DateTimeField(verbose_name='记录时间', null=False)
+    value = models.FloatField(max_length=100, verbose_name='记录值', default=0)
+    filling_mark = models.IntegerField(verbose_name='充液标志', default=0)

@@ -42,7 +42,8 @@ class Daily(models.Model):
 class DailyMod(models.Model):
     """Daily修正数据表"""
     id = models.AutoField(primary_key=True, verbose_name='日报数字id')
-    daily = models.ForeignKey(Daily, on_delete='CASCADE', max_length=100, verbose_name='日报资产')
+    apsa = models.ForeignKey(Apsa, on_delete='CASCADE', max_length=100, verbose_name='日报资产')
+    date = models.DateTimeField(verbose_name="Time")
     h_prod_mod = models.FloatField(max_length=50, default=0)
     h_stpal_mod = models.FloatField(max_length=20, default=0)
     h_stpdft_mod = models.FloatField(max_length=20, default=0)

@@ -39,7 +39,7 @@ class FillingCalculate(View):
     def calculate_main(self):
         # 设置起始时间
         if not self.start_date:
-            self.start_date = (datetime.now() + timedelta(days=-2)).strftime("%Y-%m-%d") + ' 00:00'
+            self.start_date = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d") + ' 00:00'
         t_start = self.start_date
         t_end = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d") + ' 23:59'
 
@@ -215,9 +215,9 @@ class DailyCalculate(View):
         start = query_params.get('start')
         end = query_params.get('end')
 
-        # # 检查Job状态
-        # if jobs.check('ONSITE_DAILY'):
-        #     return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
+        # 检查Job状态
+        if jobs.check('ONSITE_DAILY'):
+            return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
 
         # 设置需要计算的日期, 完成类型转换
         if not end:
@@ -243,7 +243,7 @@ class DailyCalculate(View):
         t_start = self.t_start
 
         # 查询所有需要计算的Apsa
-        apsas = Apsa.objects.filter(daily_js__gte=1)
+        apsas = Apsa.objects.filter(daily_js__gte=1).order_by('daily_js')
 
         for apsa in apsas:
             # 传递apsa全局使用
@@ -262,30 +262,16 @@ class DailyCalculate(View):
                 if apsa.daily_js == 2:
                     self.get_lin_tot_complex()
 
-            # 数据齐全，生成daily记录，success置1
-            if not self.error:
-                # 若有停机写入停机
-                self.generate_malfunction()
+            # 若有停机写入停机
+            self.generate_malfunction()
+            # 写入daily
+            self.generate_daily()
 
-                # 添加成功标志位, 更新备注信息
-                d_res['success'] = 1
-                d_res['comment'] = ''
+            # 写入daily_mod表
+            self.generate_daily_mod()
 
-                # Daily写入数据库
-                Daily.objects.update_or_create(
-                    apsa=apsa, date=t_start,
-                    defaults=d_res,
-                )
-            # 若数据不齐全，生成daily记录，success置0
-            else:
-                Daily.objects.update_or_create(
-                    apsa=apsa, date=t_start,
-                    defaults={
-                        'comment': '报错变量:' + f"{'|'.join(self.error_variables)}"
-                    }
-                )
-        # # 更新Job状态
-        # jobs.update('ONSITE_DAILY', 'OK')
+        # 更新Job状态
+        jobs.update('ONSITE_DAILY', 'OK')
 
     def set_time(self, date):
         # 设置起始时间 eg.计算9号数据 应该设置查询8，9两天数据
@@ -351,6 +337,40 @@ class DailyCalculate(View):
 
         # 保存数据
         self.daily_res['lin_tot'] = lin_tot
+
+    def generate_daily(self):
+        # 生成成功daily
+        d_res = self.daily_res
+        if not self.error:
+            # 添加成功标志位, 更新备注信息
+            d_res['success'] = 1
+            d_res['comment'] = ''
+
+            # Daily写入数据库
+            Daily.objects.update_or_create(
+                apsa=self.apsa, date=self.t_start,
+                defaults=d_res,
+            )
+        else:
+            # 添加错误变量信息
+            d_res['comment'] = '报错变量:' + f"{'|'.join(self.error_variables)}"
+            Daily.objects.update_or_create(
+                apsa=self.apsa, date=self.t_start,
+                defaults=d_res
+            )
+
+    def generate_daily_mod(self):
+        res = {
+            'user': 'SYSTEM'
+        }
+        apsa = self.apsa
+        if self.apsa.daily_js == 2:
+            res['lin_tot_mod'] = self.daily_res['lin_tot']
+            apsa = Apsa.objects.filter(id=self.apsa.daily_bind)
+        DailyMod.objects.update_or_create(
+            apsa=apsa, date=self.t_start,
+            defaults=res
+        )
 
     def generate_malfunction(self):
         """生成停机Malfunction"""

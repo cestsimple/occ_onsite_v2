@@ -4,9 +4,17 @@ from .models import Filling
 
 class FillingSerializer(ModelSerializer):
     """
-        User序列化器
+        Filling序列化器
     """
-
     class Meta:
         model = Filling
-        exclude = ['asset',]
+        exclude = ['Bulk',]
+
+
+class DailySerializer(ModelSerializer):
+    """
+        Daily序列化器
+    """
+    class Meta:
+        model = Filling
+        exclude = ['Apsa',]

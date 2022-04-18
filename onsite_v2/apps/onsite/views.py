@@ -11,8 +11,8 @@ from django.views import View
 from rest_framework.permissions import IsAdminUser
 
 from apps.iot.models import Bulk, Apsa, Variable, Record
-from .models import Filling
-from .serializer import FillingSerializer
+from .models import Filling, Daily, DailyMod, Malfunction
+from .serializer import FillingSerializer, DailySerializer
 from utils import jobs
 from utils.pagination import PageNum
 
@@ -183,3 +183,216 @@ class FillingView(ModelViewSet):
             return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'status': 200, 'msg': '保存成功'})
+
+
+class DailyCalculate(View):
+    def __init__(self):
+        self.t_start = ''
+        self.t_end = ''
+        self.apsa = None
+        self.error = 0
+        self.error_variables = []
+        self.daily_res = {
+            'h_prod': -1,
+            'h_stpal': -1,
+            'h_stpdft': -1,
+            'h_stp400v': -1,
+            'm3_prod': -1,
+            'm3_tot': -1,
+            'm3_q1': -1,
+            'm3_peak': -1,
+            'm3_q5': -1,
+            'm3_q6': -1,
+            'm3_q7': -1,
+            'filling': 0,
+            'lin_tot': 0,
+            'flow_meter': 0,
+        }
+
+    def get(self, request):
+        # 获取daily日期参数
+        query_params = request.GET
+        start = query_params.get('start')
+        end = query_params.get('end')
+
+        # # 检查Job状态
+        # if jobs.check('ONSITE_DAILY'):
+        #     return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
+
+        # 设置需要计算的日期, 完成类型转换
+        if not end:
+            end = datetime.now().date()
+        else:
+            end = datetime.strptime(end, "%Y-%m-%d").date()
+
+        if not start:
+            start = datetime.now().date()
+        else:
+            start = datetime.strptime(start, "%Y-%m-%d").date()
+
+        # 创建子线程
+        for d in self.set_date(start, end):
+            threading.Thread(target=self.calculate_main, args=(d,)).start()
+
+        # 返回相应结果
+        return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
+
+    def calculate_main(self, c_date):
+        # 设定时间(参数：时间字符串)
+        self.set_time(c_date)
+        t_start = self.t_start
+
+        # 查询所有需要计算的Apsa
+        apsas = Apsa.objects.filter(daily_js__gte=1)
+
+        for apsa in apsas:
+            # 传递apsa全局使用
+            self.apsa = apsa
+
+            # 获取daily参数
+            self.get_daily_res()
+            d_res = self.daily_res
+
+            # 如果数据源错误，可以计算lin_tot的继续计算
+            if d_res['m3_prod'] >= 0 and d_res['m3_q6'] >= 0 and d_res['m3_q7'] >= 0 and d_res['m3_peak'] >= 0:
+                # 单机apsa计算
+                if apsa.daily_js == 1:
+                    self.get_lin_tot_simple()
+                # 共用apsa计算(该机器固定补冷)
+                if apsa.daily_js == 2:
+                    self.get_lin_tot_complex()
+
+            # 数据齐全，生成daily记录，success置1
+            if not self.error:
+                # 若有停机写入停机
+                self.generate_malfunction()
+
+                # 添加成功标志位, 更新备注信息
+                d_res['success'] = 1
+                d_res['comment'] = ''
+
+                # Daily写入数据库
+                Daily.objects.update_or_create(
+                    apsa=apsa, date=t_start,
+                    defaults=d_res,
+                )
+            # 若数据不齐全，生成daily记录，success置0
+            else:
+                Daily.objects.update_or_create(
+                    apsa=apsa, date=t_start,
+                    defaults={
+                        'comment': '报错变量:' + f"{'|'.join(self.error_variables)}"
+                    }
+                )
+        # # 更新Job状态
+        # jobs.update('ONSITE_DAILY', 'OK')
+
+    def set_time(self, date):
+        # 设置起始时间 eg.计算9号数据 应该设置查询8，9两天数据
+        self.t_start = (date + timedelta(days=-1)).strftime("%Y-%m-%d")
+        self.t_end = (date + timedelta(days=0)).strftime("%Y-%m-%d")
+
+    def get_daily_res(self):
+        # 对于每个需要计算的variable
+        variables = Variable.objects.filter(asset__apsa=self.apsa).filter(~Q(daily_mark=''))
+        for v in variables:
+            try:
+                # 查询其所有record
+                data_today = Record.objects.get(variable__id=v.id, time=self.t_end).value
+                data_yesterday = Record.objects.get(variable__id=v.id, time=self.t_start).value
+                # 根据时间，计算该daily_mark的值
+                self.daily_res[v.daily_mark.lower()] = round(data_today - data_yesterday, 2)
+            except Exception as e:
+                # 若查数据缺失，错误标志置1
+                self.error = 1
+                self.error_variables.append(v.name)
+
+    def get_lin_tot_simple(self):
+        """
+        单机apsa的lin_tot
+        公式：(充液量+储罐液位首尾差量)/1000*650*(合同温度/273.15)
+        """
+        t_start = self.t_start
+        t_end = self.t_end
+
+        # 获取所有计算filling的罐子资产 fiiling_js=1表示filling记入daily，fiiling_js=2表示只计算filling，被过滤排除
+        bulks = Bulk.objects.filter(asset__site=self.apsa.asset.site, filling_js=1)
+
+        filling_quantity = 0
+        lin_bulks = 0
+        for bulk in bulks:
+            # 计算充液量 单位:升(液态)
+            filling_quantity += sum([
+                x.quantity for x in Filling.objects.filter(bulk=bulk, time_1__range=[t_start, t_end])
+            ])
+            # 计算储罐首尾液位差量
+            l_0 = Record.objects.filter(variable__asset__bulk=bulk).get(time=t_start + ' 00:00:00').value
+            l_1 = Record.objects.filter(variable__asset__bulk=bulk).get(time=t_end + ' 00:00:00').value
+            lin_bulks += (l_0 - l_1) / 100 * bulk.tank_size * 1000  # 单位:升(液态)
+
+        # 计算lin_tot,单位标立 = 储罐消耗 + 充液
+        lin_tot = round((filling_quantity + lin_bulks) / 1000 * 650 * (273.15 + self.apsa.temperature) / 273.15, 2)
+
+        # 保存数据
+        self.daily_res['lin_tot'] = lin_tot
+        self.daily_res['filling'] = filling_quantity
+
+    def get_lin_tot_complex(self):
+        """
+            共用储罐的apsa的lin_tot
+            公式：(m3产量*补冷值/100)+m3_q6+m3_q7+m3_peak
+        """
+        # 获取设定的cooling值
+        cooling_fixed = self.apsa.cooling_fixed
+
+        # 根据cooling反推lin_tot，再加上停机用液和Peak
+        lin_tot = round(self.res['m3_prod'] * cooling_fixed / 100, 2)
+        lin_tot += self.res['m3_q6'] + self.res['m3_q7'] + self.res['m3_peak']
+
+        # 保存数据
+        self.daily_res['lin_tot'] = lin_tot
+
+    def generate_malfunction(self):
+        """生成停机Malfunction"""
+        d_res = self.daily_res
+
+        if d_res['h_stpal'] or d_res['h_stpdft'] or d_res['h_stp400v']:
+            if d_res['h_stpal']:
+                default = {
+                    'stop_label': 'AL',
+                    'stop_consumption': d_res['m3_q6'],
+                    'stop_time': d_res['h_stpal'],
+                }
+            elif d_res['h_stpdft']:
+                default = {
+                    'stop_label': 'DFT',
+                    'stop_consumption': 0,
+                    'stop_time': d_res['h_stpdft'],
+                }
+            elif d_res['h_stp400v']:
+                default = {
+                    'stop_label': '400V',
+                    'stop_consumption': d_res['m3_q7'],
+                    'stop_time': d_res['h_stp400v'],
+                }
+            # 添加停机信息
+            default['t_end'] = self.t_start
+
+            # 生成记录
+            default['change_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            default['change_user'] = 'system'
+            Malfunction.objects.update_or_create(
+                apsa=self.apsa, t_start=self.t_start, stop_label=default['stop_label'],
+                defaults=default
+            )
+
+    def set_date(self, start, end):
+        res = [start]
+        if start == end:
+            return res
+        for i in range(15):
+            new_date = start + timedelta(days=i + 1)
+            if new_date == end:
+                res.append(end)
+                return res
+            res.append(new_date)

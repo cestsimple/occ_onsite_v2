@@ -685,7 +685,7 @@ class VariableModelView(UpdateListRetrieveViewSet):
         return Response(ser.data)
 
 
-class AssetModelView(ModelViewSet):
+class AssetModelView(UpdateListRetrieveViewSet):
     """自定义SiteMixinView"""
     # 查询集
     queryset = Asset.objects.filter(tags='ONSITE')
@@ -694,17 +694,30 @@ class AssetModelView(ModelViewSet):
     # 权限
     # permission_classes = [IsAuthenticated]
 
+    # 重写方法，添加过滤
     def get_queryset(self):
         # 对关键词进行过滤
+        self.apsa = 0
         apsa = self.request.query_params.get('apsa')
-        if apsa:
-            self.apsa = 1
-            return self.queryset.filter(is_apsa=1)
+
+        if self.action == 'list':
+            if apsa == '1':
+                self.apsa = 1
+                return self.queryset.filter(is_apsa=1)
+            else:
+                return self.queryset.filter(is_apsa=0)
         else:
             return self.queryset
 
+    # 根据is_apsa使用不同序列化器
     def get_serializer_class(self):
-        if self.apsa:
+        if self.action == 'list':
+            is_apsa = self.queryset[0].is_apsa
+        else:
+            pk = self.kwargs.get('pk')
+            is_apsa = Asset.objects.get(id=pk).is_apsa
+
+        if is_apsa:
             return AssetApsaSerializer
         else:
             return AssetBulkSerializer

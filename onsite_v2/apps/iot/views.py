@@ -8,12 +8,15 @@ from pycognito import Cognito
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
+
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
-from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record
+from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record, TEMP
 from datetime import datetime, timedelta
 from utils import jobs
-from .serializer import SiteSerializer, ApsaSerializer, BulkSerializer, VariableSerializer
+from .serializer import SiteSerializer, ApsaSerializer, BulkSerializer, VariableSerializer, AssetApsaSerializer, \
+    AssetBulkSerializer
 from ..user.models import User
 from django.db.models import Q
 
@@ -267,11 +270,11 @@ class TagData(View):
         return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
 
     def refresh_main(self):
-        h = get_cognito()
-        multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.assets, h))
+        #h = get_cognito()
+        #multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.assets, h))
 
         # 获取tags后对资产进行分类apsa/bulk
-        self.sort_asset()
+        #self.sort_asset()
 
         # 更新site工程师
         self.engineer_main()
@@ -302,27 +305,31 @@ class TagData(View):
 
         # 过滤ONSITE资产
         for asset in Asset.objects.filter(tags='ONSITE'):
-            name = asset.name
-            # 筛选出制氮机
-            if name in apsa_name_list:
-                if name.split('_')[0] == 'APSA':
-                    onsite_type = 'APSA'
-                    onsite_series = name.split('_')[1]
-                else:
-                    onsite_type = name
-                    onsite_series = name
-                a = Apsa(
-                    asset=asset,
-                    onsite_type=onsite_type,
-                    onsite_series=onsite_series,
-                )
-                apsa_list.append(a)
-            # 筛选出储罐
-            if 'BULK' in name and 'TOT' not in name:
-                b = Bulk(
-                    asset=asset,
-                )
-                bulk_list.append(b)
+            # 若存在则不操作
+            if Bulk.objects.filter(asset=asset).count() or Apsa.objects.filter(asset=asset).count():
+                name = asset.name
+                # 筛选出制氮机
+                if name in apsa_name_list:
+                    if name.split('_')[0] == 'APSA':
+                        onsite_type = 'APSA'
+                        onsite_series = name.split('_')[1]
+                    else:
+                        onsite_type = name
+                        onsite_series = name
+                    a = Apsa(
+                        asset=asset,
+                        onsite_type=onsite_type,
+                        onsite_series=onsite_series,
+                    )
+                    apsa_list.append(a)
+                    asset.is_apsa = 1
+                    asset.save()
+                # 筛选出储罐
+                if 'BULK' in name and 'TOT' not in name:
+                    b = Bulk(
+                        asset=asset,
+                    )
+                    bulk_list.append(b)
 
         # 写入数据库
         Apsa.objects.bulk_create(apsa_list)
@@ -351,21 +358,25 @@ class TagData(View):
                     break
 
             engineer_name = self.get_engineer_name(tag_content)
-            print(engineer_name)
             engineer = User.objects.filter(first_name=engineer_name)
             if engineer.count() == 1:
                 site.engineer = engineer[0]
-                site.save()
+            else:
+                site.engineer = User.objects.get(first_name='其他维修')
+                print(engineer_name)
+            site.save()
 
     def get_engineer_name(self, name):
         name = name.replace(' ', '')
         if len(name) > 12:
             if name[-12] == '0':
-                return name[:-12]
+                name = name[:-12]
             else:
-                return name[:-11]
+                name = name[:-11]
         if name == '维修公用机':
-            name = '何祥文'
+            return '何祥文'
+        if name == '曾立锋':
+            return '曾立峰'
         return name
 
 
@@ -672,3 +683,43 @@ class VariableModelView(UpdateListRetrieveViewSet):
         ser = self.get_serializer(query, many=True)
 
         return Response(ser.data)
+
+
+class AssetModelView(ModelViewSet):
+    """自定义SiteMixinView"""
+    # 查询集
+    queryset = Asset.objects.filter(tags='ONSITE')
+    # 序列化器
+    serializer_class = AssetApsaSerializer
+    # 权限
+    # permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # 对关键词进行过滤
+        apsa = self.request.query_params.get('apsa')
+        if apsa:
+            self.apsa = 1
+            return self.queryset.filter(is_apsa=1)
+        else:
+            return self.queryset
+
+    def get_serializer_class(self):
+        if self.apsa:
+            return AssetApsaSerializer
+        else:
+            return AssetBulkSerializer
+
+
+class TempView(View):
+    def get(self, request):
+        assets = Asset.objects.filter(tags='ONSITE')
+        db_list = []
+        for asset in assets:
+            db_list.append(TEMP(
+                site_name=asset.site.name,
+                asset_name=asset.name,
+                asset_uuid=asset.uuid
+            ))
+        TEMP.objects.bulk_create(db_list)
+
+        return JsonResponse({'status': 200})

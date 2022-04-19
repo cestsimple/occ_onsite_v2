@@ -29,12 +29,14 @@ class Asset(models.Model):
     id = models.AutoField(primary_key=True, verbose_name='资产数字id')
     uuid = models.CharField(max_length=100, verbose_name='资产UUID')
     name = models.CharField(max_length=50, verbose_name='资产名')
-    rtu_name = models.CharField(max_length=50, verbose_name='RTU名')
+    rtu_name = models.CharField(max_length=50, verbose_name='RTU名', default='')
     site = models.ForeignKey(Site, on_delete='on_delete=models.SET_NULL', null=True, blank=True)
     status = models.CharField(max_length=20, verbose_name='资产状态', default='')
     variables_num = models.IntegerField(default=-1, verbose_name='变量数')
     tags = models.CharField(max_length=100, verbose_name='标签', default='')
+    is_apsa = models.IntegerField(default=0)
     confirm = models.IntegerField(default=0, verbose_name='逻辑删除')
+    comment = models.CharField(max_length=50, verbose_name='备注', default='')
 
     class Meta:
         ordering = ['id']
@@ -43,7 +45,7 @@ class Asset(models.Model):
 class Bulk(models.Model):
     """bulk信息单"""
     id = models.AutoField(primary_key=True, verbose_name='数字id')
-    asset = models.ForeignKey(Asset, on_delete='CASCADE', null=True, blank=True)
+    asset = models.ForeignKey(Asset, related_name='bulk', on_delete='CASCADE', null=True, blank=True)
     tank_size = models.FloatField(max_length=30, verbose_name='储罐大小', default=0)
     tank_func = models.CharField(max_length=30, verbose_name='储罐功能', default='')
     level_a = models.FloatField(max_length=30, verbose_name='filling标志a', default=1)
@@ -51,7 +53,6 @@ class Bulk(models.Model):
     level_c = models.FloatField(max_length=30, verbose_name='filling标志c', default=10)
     level_d = models.FloatField(max_length=30, verbose_name='filling标志d', default=0.5)
     filling_js = models.BooleanField(default=False, verbose_name='计算filling')
-    comment = models.CharField(max_length=50, verbose_name='备注', default='')
 
     class Meta:
         ordering = ['id']
@@ -60,7 +61,7 @@ class Bulk(models.Model):
 class Apsa(models.Model):
     """apsa信息单"""
     id = models.AutoField(primary_key=True, verbose_name='数字id')
-    asset = models.ForeignKey(Asset, on_delete='CASCADE', null=True, blank=True)
+    asset = models.ForeignKey(Asset, related_name='apsa', on_delete='CASCADE', null=True, blank=True)
     onsite_type = models.CharField(max_length=30, verbose_name='类型', default='')
     onsite_series = models.CharField(max_length=30, verbose_name='型号', default='')
     facility_fin = models.CharField(max_length=50, verbose_name='项目号', default='')
@@ -72,7 +73,6 @@ class Apsa(models.Model):
     daily_bind = models.CharField(max_length=100, verbose_name='daily绑定资产id', default='')
     flow_meter = models.CharField(max_length=100, verbose_name='流量计变量id', default='')
     cooling_fixed = models.FloatField(max_length=10, verbose_name='cooling设定值', default=0)
-    comment = models.CharField(max_length=50, verbose_name='备注', default='')
 
     class Meta:
         ordering = ['id']
@@ -98,3 +98,10 @@ class Record(models.Model):
     time = models.DateTimeField(verbose_name='记录时间', null=False)
     value = models.FloatField(max_length=100, verbose_name='记录值', default=0)
     filling_mark = models.IntegerField(verbose_name='充液标志', default=0)
+
+
+class TEMP(models.Model):
+    id = models.AutoField(primary_key=True, verbose_name='数字id')
+    site_name = models.CharField(max_length=30, verbose_name='类型', default='')
+    asset_name = models.CharField(max_length=30, verbose_name='类型', default='')
+    asset_uuid = models.CharField(max_length=100, verbose_name='类型', default='')

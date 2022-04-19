@@ -28,6 +28,7 @@ urlpatterns = [
     url(r'^variable/search/$', views.VariableModelView.as_view({'get': 'search'})),
 
     # 查询asset修改数据
-    # url(r'^asset/$', views.AssetModelView.as_view({'get': 'list'})),
-    # url(r'^asset/(?P<pk>\d+)/$', views.AssetModelView.as_view({'get': 'retrieve', 'put': 'update'})),
+    url(r'^asset/$', views.AssetModelView.as_view({'get': 'list', 'put': 'update'})),
+    url(r'^asset/(?P<pk>\d+)/$', views.AssetModelView.as_view({'get': 'retrieve', 'put': 'update'})),
+    url(r'^iot/temp/$', views.TempView.as_view()),
 ]

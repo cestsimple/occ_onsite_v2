@@ -103,5 +103,3 @@ class VariableSerializer(ModelSerializer):
     class Meta:
         model = Variable
         exclude = ('asset', 'uuid',)
-
-

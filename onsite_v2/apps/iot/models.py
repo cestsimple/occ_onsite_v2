@@ -98,10 +98,3 @@ class Record(models.Model):
     time = models.DateTimeField(verbose_name='记录时间', null=False)
     value = models.FloatField(max_length=100, verbose_name='记录值', default=0)
     filling_mark = models.IntegerField(verbose_name='充液标志', default=0)
-
-
-class TEMP(models.Model):
-    id = models.AutoField(primary_key=True, verbose_name='数字id')
-    site_name = models.CharField(max_length=30, verbose_name='类型', default='')
-    asset_name = models.CharField(max_length=30, verbose_name='类型', default='')
-    asset_uuid = models.CharField(max_length=100, verbose_name='类型', default='')

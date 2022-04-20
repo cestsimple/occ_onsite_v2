@@ -12,7 +12,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
-from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record, TEMP
+from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record
 from datetime import datetime, timedelta
 from utils import jobs
 from .serializer import SiteSerializer, ApsaSerializer, BulkSerializer, VariableSerializer, AssetApsaSerializer, \
@@ -631,12 +631,7 @@ class BulkModelView(UpdateListRetrieveViewSet):
     def update(self, request, pk):
         tank_size = request.data.get('tank_size')
         tank_func = request.data.get('tank_func')
-        level_a = request.data.get('level_a')
-        level_b = request.data.get('level_b')
-        level_c = request.data.get('level_c')
-        level_d = request.data.get('level_d')
         filling_js = request.data.get('filling_js')
-        comment = request.data.get('comment')
 
         try:
             bulk = Bulk.objects.get(id=int(pk))
@@ -644,12 +639,8 @@ class BulkModelView(UpdateListRetrieveViewSet):
                 bulk.tank_size = tank_size
             if tank_func:
                 bulk.tank_func = tank_func
-            bulk.level_a = level_a
-            bulk.level_b = level_b
-            bulk.level_c = level_c
-            bulk.level_d = level_d
-            bulk.filling_js = filling_js
-            bulk.comment = comment
+            if filling_js:
+                bulk.filling_js = filling_js
             bulk.save()
         except DatabaseError as e:
             print(e)
@@ -722,17 +713,89 @@ class AssetModelView(UpdateListRetrieveViewSet):
         else:
             return AssetBulkSerializer
 
+    def update(self, request, pk):
+        rtu_name = request.data.get('rtu_name')
+        comment = request.data.get('comment')
+        engineer_id = request.data.get('engineer_id')
+        asset = Asset.objects.get(id=pk)
+        bulk = None
+        apsa = None
 
-class TempView(View):
-    def get(self, request):
-        assets = Asset.objects.filter(tags='ONSITE')
-        db_list = []
-        for asset in assets:
-            db_list.append(TEMP(
-                site_name=asset.site.name,
-                asset_name=asset.name,
-                asset_uuid=asset.uuid
-            ))
-        TEMP.objects.bulk_create(db_list)
+        if asset.is_apsa:
+            # 获取传入参数
+            onsite_type = request.data.get('onsite_type')
+            onsite_series = request.data.get('onsite_series')
+            facility_fin = request.data.get('facility_fin')
+            daily_js = request.data.get('daily_js')
+            temperature = request.data.get('temperature')
+            vap_max = request.data.get('vap_max')
+            vap_type = request.data.get('vap_type')
+            norminal_flow = request.data.get('norminal_flow')
+            daily_bind = request.data.get('daily_bind')
+            flow_meter = request.data.get('flow_meter')
+            cooling_fixed = request.data.get('cooling_fixed')
+            # 验证保存数据
+            try:
+                # apsa保存
+                apsa = Apsa.objects.get(asset=asset)
+                apsa.onsite_type = onsite_type
+                apsa.onsite_series = onsite_series
+                apsa.daily_js = daily_js
+                apsa.temperature = temperature
+                apsa.norminal_flow = norminal_flow
+                if vap_max:
+                    apsa.vap_max = vap_max
+                if vap_type:
+                    apsa.vap_type = vap_type
+                if daily_bind:
+                    apsa.daily_bind = daily_bind
+                    apsa.cooling_fixed = cooling_fixed
+                if flow_meter:
+                    apsa.flow_meter = flow_meter
+                if facility_fin:
+                    apsa.facility_fin = facility_fin
+            except DatabaseError as e:
+                print(e)
+                return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # 获取传入参数
+            tank_size = request.data.get('tank_size')
+            tank_func = request.data.get('tank_func')
+            level_a = request.data.get('level_a')
+            level_b = request.data.get('level_b')
+            level_c = request.data.get('level_c')
+            level_d = request.data.get('level_d')
+            filling_js = request.data.get('filling_js')
+            # 验证保存数据
+            try:
+                # bulk保存
+                bulk = Bulk.objects.get(asset=asset)
+                bulk.tank_size = tank_size
+                bulk.tank_func = tank_func
+                bulk.level_a = level_a
+                bulk.level_b = level_b
+                bulk.level_c = level_c
+                bulk.level_d = level_d
+                bulk.filling_js = filling_js
+            except DatabaseError as e:
+                print(e)
+                return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
 
-        return JsonResponse({'status': 200})
+        # 保存asset和site
+        if comment:
+            asset.comment = comment
+        asset.rtu_name = rtu_name
+        site = Site.objects.get(asset=asset)
+        site.engineer_id = engineer_id
+        try:
+            if bulk:
+                bulk.save()
+            if apsa:
+                apsa.save()
+            asset.save()
+            site.save()
+        except DatabaseError as e:
+            print(e)
+            return Response('数据库保存错误', status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'status': 200, 'msg': '保存成功'})

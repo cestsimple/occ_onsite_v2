@@ -411,7 +411,7 @@ class FillingModelView(ModelViewSet):
             self.queryset = self.queryset.filter(
                 Q(bulk__asset__rtu_name__contains=name) | Q(bulk__asset__site__name__contains=name)
             )
-        if start:
+        if start and end:
             self.queryset = self.queryset.filter(time_1__range=[start + ' 00:00', end + ' 23:59'])
 
         return self.queryset
@@ -497,7 +497,7 @@ class DailyModelView(ListViewSet):
             self.queryset = self.queryset.filter(
                 Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
             )
-        if start:
+        if start and end:
             self.queryset = self.queryset.filter(date__range=[start + ' 00:00', end + ' 23:59'])
 
         return self.queryset
@@ -527,8 +527,8 @@ class MalfunctionModelView(ModelViewSet):
     def get_queryset(self):
         # 重写，添加条件过滤功能
         querry = self.request.query_params
-        start = querry.get('start') + ' 00:00'
-        end = querry.get('end') + ' 23:59'
+        start = querry.get('start')
+        end = querry.get('end')
         name = querry.get('name')
         region = querry.get('region')
         group = querry.get('group')
@@ -542,11 +542,61 @@ class MalfunctionModelView(ModelViewSet):
             self.queryset = self.queryset.filter(
                 Q(apsa__asset__rtu_name__contains=name)|Q(apsa__asset__site__name__contains=name)
             )
-        if start:
-            self.queryset = self.queryset.filter(t_start__range=[start, end])
+        if start and end:
+            self.queryset = self.queryset.filter(t_start__range=[start + ' 00:00', end + ' 23:59'])
 
         return self.queryset
 
+    def create(self, request, *args, **kwargs):
+        apsa_id = request.data.get('apsa_id')
+        t_start = request.data.get('t_start')
+        t_end = request.data.get('t_end')
+        stop_label = request.data.get('stop_label')
+        stop_alarm = request.data.get('stop_alarm')
+        reason_main = request.data.get('reason_main')
+        reason_l1 = request.data.get('reason_l1')
+        reason_l2 = request.data.get('reason_l2')
+        reason_l3 = request.data.get('reason_l3')
+        reason_l4 = request.data.get('reason_l4')
+        reason_detail_1 = request.data.get('reason_detail_1')
+        reason_detail_2 = request.data.get('reason_detail_2')
+        mt_comment = request.data.get('mt_comment')
+        occ_comment = request.data.get('occ_comment')
+        change_user = request.data.get('change_user')
+        stop_count = int(request.data.get('stop_count'))
+        stop_hour = float(request.data.get('stop_hour'))
+        stop_consumption = float(request.data.get('stop_consumption'))
+
+        # 验证是否存在充液记录
+        if Malfunction.objects.filter(apsa=apsa_id, t_start=t_start).count() != 0:
+            return Response(f'创建失败，气站时间冲突，已存在该记录', status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            Malfunction.objects.create(
+                apsa_id=int(apsa_id),
+                t_start=t_start,
+                t_end=t_end,
+                stop_consumption=stop_consumption,
+                stop_count=stop_count,
+                stop_hour=stop_hour,
+                stop_label=stop_label,
+                stop_alarm=stop_alarm,
+                reason_main=reason_main,
+                reason_l1=reason_l1,
+                reason_l2=reason_l2,
+                reason_l3=reason_l3,
+                reason_l4=reason_l4,
+                reason_detail_1=reason_detail_1,
+                reason_detail_2=reason_detail_2,
+                mt_comment=mt_comment,
+                occ_comment=occ_comment,
+                change_user=change_user,
+                change_date=datetime.now()
+            )
+        except DatabaseError as e:
+            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'status': 200, 'msg': '充液记录创建成功'})
 
 class ReasonModelView(ListViewSet):
     # 查询集

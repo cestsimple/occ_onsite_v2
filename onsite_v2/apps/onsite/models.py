@@ -76,7 +76,8 @@ class Malfunction(models.Model):
     reason_l2 = models.CharField(max_length=100, default='')
     reason_l3 = models.CharField(max_length=100, default='')
     reason_l4 = models.CharField(max_length=100, default='')
-    reason_detail = models.CharField(max_length=100, default='')
+    reason_detail_1 = models.CharField(max_length=100, default='')
+    reason_detail_2 = models.CharField(max_length=100, default='')
     mt_comment = models.CharField(max_length=200, default='')
     occ_comment = models.CharField(max_length=200, default='')
     change_date = models.DateTimeField(verbose_name="最后修改时间")
@@ -93,7 +94,7 @@ class Reason(models.Model):
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, related_name='subs', blank=True, verbose_name='上级原因')
 
 
-class ReasonCategory(models.Model):
+class ReasonDetail(models.Model):
     """ 停机原因分类表 """
     id = models.AutoField(primary_key=True, verbose_name='数字id')
     cname = models.CharField(max_length=100, default='')

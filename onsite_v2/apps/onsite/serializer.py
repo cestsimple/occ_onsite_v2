@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Filling, Daily, DailyMod
+from .models import Filling, Daily, DailyMod, Malfunction
 from ..iot.models import Site, Asset, Apsa
 
 
@@ -141,3 +141,22 @@ class DailyModSerializer(serializers.ModelSerializer):
     class Meta:
         model = DailyMod
         exclude = ['id', 'date', 'apsa']
+
+
+class MalfunctionSerializer(serializers.ModelSerializer):
+    asset_name = serializers.SerializerMethodField()
+    rtu_name = serializers.SerializerMethodField()
+    avg_con = serializers.SerializerMethodField()
+
+    def get_asset_name(self, obj):
+        return Asset.objects.get(apsa=obj.apsa).name
+
+    def get_rtu_name(self, obj):
+        return Asset.objects.get(apsa=obj.apsa).rtu_name
+
+    def get_avg_con(self, obj):
+        return round(obj.stop_consumption / obj.stop_hour, 2)
+
+    class Meta:
+        model = Malfunction
+        exclude = ['apsa', 'confirm']

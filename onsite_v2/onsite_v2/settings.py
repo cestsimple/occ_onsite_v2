@@ -177,7 +177,7 @@ LOGIN_URL = '/user/login/'
 
 # 配置时间格式，解决中间带T的问题
 REST_FRAMEWORK = {
-    'DATETIME_FORMAT': "%Y-%m-%d %H:%M:%S",
+    'DATETIME_FORMAT': "%Y-%m-%d %H:%M",
     'EXCEPTION_HANDLER': 'utils.drf.exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
             'rest_framework_jwt.authentication.JSONWebTokenAuthentication',

@@ -10,10 +10,10 @@ from django.http import JsonResponse
 from django.views import View
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 
-from apps.iot.models import Bulk, Apsa, Variable, Record
+from apps.iot.models import Bulk, Apsa, Variable, Record, Asset
 from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet
-from .models import Filling, Daily, DailyMod, Malfunction
-from .serializer import FillingSerializer, DailySerializer, DailyModSerializer
+from .models import Filling, Daily, DailyMod, Malfunction, Reason
+from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer
 from utils import jobs
 from utils.pagination import PageNum
 
@@ -394,11 +394,26 @@ class FillingModelView(ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # 重写，添加条件过滤功能
         querry = self.request.query_params
-        date = querry.get('date')
+        start = querry.get('start')
+        end = querry.get('end')
+        name = querry.get('name')
+        region = querry.get('region')
+        group = querry.get('group')
 
-        if date:
-            return self.queryset.filter(date=date)
+        if region:
+            self.queryset = self.queryset.filter(bulk__asset__site__engineer__region=region)
+        if group:
+            self.queryset = self.queryset.filter(bulk__asset__site__engineer__group=group)
+        if name:
+            name = name.upper()
+            self.queryset = self.queryset.filter(
+                Q(bulk__asset__rtu_name__contains=name) | Q(bulk__asset__site__name__contains=name)
+            )
+        if start:
+            self.queryset = self.queryset.filter(time_1__range=[start + ' 00:00', end + ' 23:59'])
+
         return self.queryset
 
     def create(self, request, *args, **kwargs):
@@ -465,11 +480,26 @@ class DailyModelView(ListViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # 重写，添加条件过滤功能
         querry = self.request.query_params
-        date = querry.get('date')
+        start = querry.get('start')
+        end = querry.get('end')
+        name = querry.get('name')
+        region = querry.get('region')
+        group = querry.get('group')
 
-        if date:
-            return self.queryset.filter(date=date)
+        if region:
+            self.queryset = self.queryset.filter(apsa__asset__site__engineer__region=region)
+        if group:
+            self.queryset = self.queryset.filter(apsa__asset__site__engineer__group=group)
+        if name:
+            name = name.upper()
+            self.queryset = self.queryset.filter(
+                Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
+            )
+        if start:
+            self.queryset = self.queryset.filter(date__range=[start + ' 00:00', end + ' 23:59'])
+
         return self.queryset
 
 
@@ -482,3 +512,87 @@ class DailyModModelView(RetrieveUpdateViewSet):
     pagination_class = PageNum
     # 权限
     permission_classes = [IsAuthenticated]
+
+
+class MalfunctionModelView(ModelViewSet):
+    # 查询集
+    queryset = Malfunction.objects.all()
+    # 序列化器
+    serializer_class = MalfunctionSerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    # permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # 重写，添加条件过滤功能
+        querry = self.request.query_params
+        start = querry.get('start') + ' 00:00'
+        end = querry.get('end') + ' 23:59'
+        name = querry.get('name')
+        region = querry.get('region')
+        group = querry.get('group')
+
+        if region:
+            self.queryset = self.queryset.filter(apsa__asset__site__engineer__region=region)
+        if group:
+            self.queryset = self.queryset.filter(apsa__asset__site__engineer__group=group)
+        if name:
+            name = name.upper()
+            self.queryset = self.queryset.filter(
+                Q(apsa__asset__rtu_name__contains=name)|Q(apsa__asset__site__name__contains=name)
+            )
+        if start:
+            self.queryset = self.queryset.filter(t_start__range=[start, end])
+
+        return self.queryset
+
+
+class ReasonModelView(ListViewSet):
+    # 查询集
+    queryset = Malfunction.objects.all()
+    # 序列化器
+    serializer_class = MalfunctionSerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    # permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        query = request.query_params
+        parent = query.get('parent')
+
+        if not parent:
+            try:
+                # 查询一级原因
+                reason_level_1 = Reason.objects.filter(parent=None)
+                # 序列化一级原因
+                reason_list = []
+                for reason in reason_level_1:
+                    reason_list.append({'id': reason.id, 'cname': reason.cname})
+            except Exception as e:
+                print(e)
+                return JsonResponse({'code': 400, 'errmsg': '一级原因数据错误'})
+            # 响应一级原因数据
+            return JsonResponse({'code': 200, 'errmsg': 'OK', 'reason_list': reason_list})
+        else:
+            # 提供下级原因
+            try:
+                parent_model = Reason.objects.get(id=parent)  # 查询下级原因的父级
+                sub_model_list = parent_model.subs.all()
+
+                # 序列化下级原因数据
+                sub_list = []
+                for sub_model in sub_model_list:
+                    sub_list.append({'id': sub_model.id, 'cname': sub_model.cname})
+
+                sub_data = {
+                    'id': parent_model.id,  # 父级pk
+                    'cname': parent_model.cname,  # 父级name
+                    'subs': sub_list  # 父级的子集
+                }
+            except Exception as e:
+                print(e)
+                return JsonResponse({'code': 400, 'errmsg': '下级原因数据错误'})
+
+            return JsonResponse({'code': 200, 'errmsg': 'OK', 'sub_data': sub_data})

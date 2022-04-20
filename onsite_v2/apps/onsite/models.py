@@ -67,7 +67,7 @@ class Malfunction(models.Model):
     t_start = models.DateTimeField(verbose_name="停机开始时间")
     t_end = models.DateTimeField(verbose_name="停机结束时间")
     stop_count = models.IntegerField(verbose_name='停机次数', default=1)
-    stop_time = models.FloatField(max_length=20, default=0)
+    stop_hour = models.FloatField(max_length=20, default=0)
     stop_consumption = models.FloatField(max_length=20, default=0)
     stop_label = models.CharField(max_length=100, default='')
     stop_alarm = models.CharField(max_length=100, default='')
@@ -77,7 +77,8 @@ class Malfunction(models.Model):
     reason_l3 = models.CharField(max_length=100, default='')
     reason_l4 = models.CharField(max_length=100, default='')
     reason_detail = models.CharField(max_length=100, default='')
-    description = models.CharField(max_length=100, default='')
+    mt_comment = models.CharField(max_length=200, default='')
+    occ_comment = models.CharField(max_length=200, default='')
     change_date = models.DateTimeField(verbose_name="最后修改时间")
     change_user = models.CharField(max_length=100, verbose_name="最后修改用户")
     confirm = models.IntegerField(verbose_name='确认标志', default=0)
@@ -85,8 +86,16 @@ class Malfunction(models.Model):
 
 class Reason(models.Model):
     """ 停机原因表 """
-    id = models.AutoField(primary_key=True, verbose_name='停机数字id')
+    id = models.AutoField(primary_key=True, verbose_name='数字id')
     cname = models.CharField(max_length=100, default='')
     ename = models.CharField(max_length=100, default='')
     # 默认一对多查询related_name .MalfunctionReason_set.all()
+    parent = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, related_name='subs', blank=True, verbose_name='上级原因')
+
+
+class ReasonCategory(models.Model):
+    """ 停机原因分类表 """
+    id = models.AutoField(primary_key=True, verbose_name='数字id')
+    cname = models.CharField(max_length=100, default='')
+    ename = models.CharField(max_length=100, default='')
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, related_name='subs', blank=True, verbose_name='上级原因')

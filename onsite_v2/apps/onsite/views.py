@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 
 from django.db import DatabaseError
 from django.db.models import Q
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from django.http import JsonResponse
@@ -11,8 +10,9 @@ from django.views import View
 from rest_framework.permissions import IsAdminUser
 
 from apps.iot.models import Bulk, Apsa, Variable, Record
+from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet
 from .models import Filling, Daily, DailyMod, Malfunction
-from .serializer import FillingSerializer, DailySerializer
+from .serializer import FillingSerializer, DailySerializer, DailyModSerializer
 from utils import jobs
 from utils.pagination import PageNum
 
@@ -147,42 +147,6 @@ class FillingCalculate(View):
                 # 也为下降不管，充液长度置零
                 fill_len = 0
         return result
-
-
-class FillingView(ModelViewSet):
-    # 查询集
-    queryset = Filling.objects.all()
-    # 序列化器
-    serializer_class = FillingSerializer
-    # 指定分页器
-    pagination_class = PageNum
-    # 权限
-    permission_classes = [IsAdminUser]
-
-    def search(self, request):
-        query_params = request.GET
-        engineer = query_params.get('engineer')
-
-        query = self.queryset
-
-        if engineer:
-            query = query.filter(~Q(group=''))
-
-        ser = self.get_serializer(query, many=True)
-
-        return Response(ser.data)
-
-    def update(self, request, pk):
-        email = request.data.get('email')
-
-        try:
-            filling = Filling.objects.get(id=pk)
-            filling.save()
-        except DatabaseError as e:
-            print(e)
-            return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
-
-        return Response({'status': 200, 'msg': '保存成功'})
 
 
 class DailyCalculate(View):
@@ -416,3 +380,52 @@ class DailyCalculate(View):
                 res.append(end)
                 return res
             res.append(new_date)
+
+
+class FillingModelView(ModelViewSet):
+    # 查询集
+    queryset = Filling.objects.all()
+    # 序列化器
+    serializer_class = FillingSerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        querry = self.request.query_params
+        date = querry.get('date')
+
+        if date:
+            return self.queryset.filter(date=date)
+        return self.queryset
+
+
+class DailyModelView(ListViewSet):
+    # 查询集
+    queryset = Daily.objects.all()
+    # 序列化器
+    serializer_class = DailySerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    #permission_classes = [IsAdminUser]
+
+    def get_queryset(self):
+        querry = self.request.query_params
+        date = querry.get('date')
+
+        if date:
+            return self.queryset.filter(date=date)
+        return self.queryset
+
+
+class DailyModModelView(RetrieveUpdateViewSet):
+    # 查询集
+    queryset = DailyMod.objects.all()
+    # 序列化器
+    serializer_class = DailyModSerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    # permission_classes = [IsAdminUser]

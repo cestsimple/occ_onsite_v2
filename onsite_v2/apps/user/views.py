@@ -53,8 +53,8 @@ class UserView(ModelViewSet):
     permission_classes = [IsAdminUser]
 
     def get_queryset(self):
-        query = self.queryset
-        engineer = query.get('engineer')
+        query_params = self.query_params
+        engineer = query_params.get('engineer')
 
         if engineer:
             return self.queryset.filter(~Q(group='occ'))

@@ -546,9 +546,9 @@ class SiteModelView(UpdateListRetrieveViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        query = self.queryset
-        apsa = query.get('apsa')
-        bulk = query.get('bulk')
+        query_params = self.request.query_params
+        apsa = query_params.get('apsa')
+        bulk = query_params.get('bulk')
 
         if apsa:
             return self.queryset.filter(asset__apsa__id=apsa)
@@ -652,9 +652,9 @@ class VariableModelView(UpdateListRetrieveViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        query = self.queryset
-        apsa = query.get('apsa')
-        bulk = query.get('bulk')
+        query_params = self.request.query_params
+        apsa = query_params.get('apsa')
+        bulk = query_params.get('bulk')
 
         if apsa:
             return self.queryset.filter(asset__apsa__id=apsa)

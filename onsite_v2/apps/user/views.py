@@ -11,7 +11,6 @@ from rest_framework.viewsets import ModelViewSet
 from utils.pagination import PageNum
 from .models import User
 from .serializer import UserSerializer
-from ..iot.models import Apsa
 
 
 class IndexView(View):
@@ -53,18 +52,14 @@ class UserView(ModelViewSet):
     # 权限
     permission_classes = [IsAdminUser]
 
-    def search(self, request):
-        query_params = request.GET
-        engineer = query_params.get('engineer')
-
+    def get_queryset(self):
         query = self.queryset
+        engineer = query.get('engineer')
 
         if engineer:
-            query = query.filter(~Q(group=''))
+            return self.queryset.filter(~Q(group='occ'))
 
-        ser = self.get_serializer(query, many=True)
-
-        return Response(ser.data)
+        return self.queryset
 
     def update(self, request, pk):
         username = request.data.get('username')

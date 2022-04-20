@@ -551,10 +551,10 @@ class SiteModelView(UpdateListRetrieveViewSet):
         bulk = query.get('bulk')
 
         if apsa:
-            return query.filter(asset__apsa__id=apsa)
+            return self.queryset.filter(asset__apsa__id=apsa)
 
         if bulk:
-            return query.filter(asset__bulk__id=bulk)
+            return self.queryset.filter(asset__bulk__id=bulk)
 
         return self.queryset
 
@@ -657,10 +657,10 @@ class VariableModelView(UpdateListRetrieveViewSet):
         bulk = query.get('bulk')
 
         if apsa:
-            return query.filter(asset__apsa__id=apsa)
+            return self.queryset.filter(asset__apsa__id=apsa)
 
         if bulk:
-            return query.filter(asset__bulk__id=bulk)
+            return self.queryset.filter(asset__bulk__id=bulk)
 
         return self.queryset
 

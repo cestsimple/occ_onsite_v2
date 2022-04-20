@@ -7,9 +7,24 @@ class FillingSerializer(serializers.ModelSerializer):
     """
         Filling序列化器
     """
+    asset_name = serializers.SerializerMethodField()
+    rtu_name = serializers.SerializerMethodField()
+    tank_size = serializers.SerializerMethodField()
+
+    def get_asset_name(self, obj):
+        return Asset.objects.get(bulk=obj.bulk).name
+
+    def get_rtu_name(self, obj):
+        return Asset.objects.get(bulk=obj.bulk).rtu_name
+
+    def get_tank_size(self, obj):
+        return obj.bulk.tank_size
+
     class Meta:
         model = Filling
-        exclude = ['Bulk',]
+        exclude = ['confirm']
+        read_only_fields = ['rtu_name', 'asset_name', 'tank_size', 'id']
+        write_only_fields = ['bulk']
 
 
 class DailySerializer(serializers.ModelSerializer):

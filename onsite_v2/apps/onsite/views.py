@@ -3,11 +3,12 @@ from datetime import datetime, timedelta
 
 from django.db import DatabaseError
 from django.db.models import Q
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from django.http import JsonResponse
 from django.views import View
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 
 from apps.iot.models import Bulk, Apsa, Variable, Record
 from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet
@@ -390,7 +391,7 @@ class FillingModelView(ModelViewSet):
     # 指定分页器
     pagination_class = PageNum
     # 权限
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         querry = self.request.query_params
@@ -399,6 +400,58 @@ class FillingModelView(ModelViewSet):
         if date:
             return self.queryset.filter(date=date)
         return self.queryset
+
+    def create(self, request, *args, **kwargs):
+        bulk = request.data.get('bulk')
+        time_1 = request.data.get('time_1')
+        time_2 = request.data.get('time_2')
+        level_1 = float(request.data.get('level_1'))
+        level_2 = float(request.data.get('level_2'))
+
+        # 验证是否存在充液记录
+        if Filling.objects.filter(bulk=bulk, time_1=time_1).count() != 0:
+            return Response(f'创建失败，储罐和时间冲突，已存在该记录', status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            tank_size = float(Bulk.objects.get(id=bulk).tank_size)
+            quantity = round((level_2 - level_1) / 100 * tank_size * 1000, 2)
+
+            Filling.objects.create(
+                bulk_id=int(bulk),
+                time_1=time_1,
+                time_2=time_2,
+                level_1=level_1,
+                level_2=level_2,
+                quantity=quantity
+            )
+        except DatabaseError as e:
+            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'status': 200, 'msg': '充液记录创建成功'})
+
+    def update(self, request, pk):
+        # 查询记录
+        filling = Filling.objects.get(id=pk)
+        # 获取参数
+        bulk = request.data.get('bulk')
+        time_1 = request.data.get('time_1')
+        time_2 = request.data.get('time_2')
+        level_1 = float(request.data.get('level_1'))
+        level_2 = float(request.data.get('level_2'))
+        tank_size = float(Bulk.objects.get(id=bulk).tank_size)
+        quantity = round((level_2 - level_1) / 100 * tank_size * 1000, 2)
+        # 保存数据
+        try:
+            filling.time_1 = time_1
+            filling.time_2 = time_2
+            filling.level_1 = level_1
+            filling.level_2 = level_2
+            filling.quantity = quantity
+            filling.save()
+        except DatabaseError as e:
+            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'status': 200, 'msg': '充液记录修改成功'})
 
 
 class DailyModelView(ListViewSet):
@@ -409,7 +462,7 @@ class DailyModelView(ListViewSet):
     # 指定分页器
     pagination_class = PageNum
     # 权限
-    #permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         querry = self.request.query_params
@@ -428,4 +481,4 @@ class DailyModModelView(RetrieveUpdateViewSet):
     # 指定分页器
     pagination_class = PageNum
     # 权限
-    # permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated]

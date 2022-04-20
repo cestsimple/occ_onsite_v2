@@ -8,8 +8,9 @@ urlpatterns = [
 
     # 增删改查
     # filling
-    url(r'^filling/$', views.FillingModelView.as_view({'get': 'list', 'put': 'update'})),
-    url(r'^filling/(?P<pk>\d+)/$', views.FillingModelView.as_view({'get': 'retrieve', 'put': 'update'})),
+    url(r'^filling/$', views.FillingModelView.as_view({'get': 'list', 'post': 'create'})),
+    url(r'^filling/(?P<pk>\d+)/$',
+        views.FillingModelView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
     # daily
     url(r'^daily/$', views.DailyModelView.as_view({'get': 'list'})),
     # daily_mod

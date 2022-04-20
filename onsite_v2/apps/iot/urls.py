@@ -12,7 +12,6 @@ urlpatterns = [
     # 查询site修改数据
     url(r'^site/$', views.SiteModelView.as_view({'get': 'list'})),
     url(r'^site/(?P<pk>\d+)/$', views.SiteModelView.as_view({'get': 'retrieve', 'put': 'update'})),
-    url(r'^site/search/$', views.SiteModelView.as_view({'get': 'search'})),
 
     # 查询apsa修改数据
     url(r'^apsa/$', views.ApsaModelView.as_view({'get': 'list'})),
@@ -25,7 +24,6 @@ urlpatterns = [
     # 查询bulk修改数据
     url(r'^variable/$', views.VariableModelView.as_view({'get': 'list'})),
     url(r'^variable/(?P<pk>\d+)/$', views.VariableModelView.as_view({'get': 'retrieve', 'put': 'update'})),
-    url(r'^variable/search/$', views.VariableModelView.as_view({'get': 'search'})),
 
     # 查询asset修改数据
     url(r'^asset/$', views.AssetModelView.as_view({'get': 'list', 'put': 'update'})),

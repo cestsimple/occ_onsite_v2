@@ -8,7 +8,6 @@ from pycognito import Cognito
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
 
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
@@ -546,24 +545,18 @@ class SiteModelView(UpdateListRetrieveViewSet):
     # 权限
     permission_classes = [IsAuthenticated]
 
-    def search(self, request):
-        query_params = request.GET
-        apsa = query_params.get('apsa')
-        bulk = query_params.get('bulk')
-
+    def get_queryset(self):
         query = self.queryset
+        apsa = query.get('apsa')
+        bulk = query.get('bulk')
 
         if apsa:
-            site_id = Apsa.objects.get(id=apsa).asset.site.id
-            query = query.get(id=site_id)
+            return query.filter(asset__apsa__id=apsa)
 
         if bulk:
-            site_id = Bulk.objects.get(id=bulk).asset.site.id
-            query = query.get(id=site_id)
+            return query.filter(asset__bulk__id=bulk)
 
-        ser = self.get_serializer(query)
-
-        return Response(ser.data)
+        return self.queryset
 
 
 class ApsaModelView(UpdateListRetrieveViewSet):
@@ -658,22 +651,18 @@ class VariableModelView(UpdateListRetrieveViewSet):
     # 权限
     permission_classes = [IsAuthenticated]
 
-    def search(self, request):
-        query_params = request.GET
-        apsa = query_params.get('apsa')
-        bulk = query_params.get('bulk')
-
+    def get_queryset(self):
         query = self.queryset
+        apsa = query.get('apsa')
+        bulk = query.get('bulk')
 
         if apsa:
-            query = query.filter(asset__apsa__id=apsa)
+            return query.filter(asset__apsa__id=apsa)
 
         if bulk:
-            query = query.filter(asset__bulk__id=bulk)
+            return query.filter(asset__bulk__id=bulk)
 
-        ser = self.get_serializer(query, many=True)
-
-        return Response(ser.data)
+        return self.queryset
 
 
 class AssetModelView(UpdateListRetrieveViewSet):

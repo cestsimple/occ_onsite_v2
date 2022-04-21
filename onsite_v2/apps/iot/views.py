@@ -653,14 +653,10 @@ class VariableModelView(UpdateListRetrieveViewSet):
 
     def get_queryset(self):
         query_params = self.request.query_params
-        apsa = query_params.get('apsa')
-        bulk = query_params.get('bulk')
+        asset = query_params.get('asset')
 
-        if apsa:
-            return self.queryset.filter(asset__apsa__id=apsa)
-
-        if bulk:
-            return self.queryset.filter(asset__bulk__id=bulk)
+        if asset:
+            return self.queryset.filter(asset__id=asset)
 
         return self.queryset
 
@@ -671,28 +667,32 @@ class AssetModelView(UpdateListRetrieveViewSet):
     queryset = Asset.objects.filter(tags='ONSITE')
     # 序列化器
     serializer_class = AssetApsaSerializer
+    # 分页器
+    pagination_class = PageNum
     # 权限
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     # 重写方法，添加过滤
     def get_queryset(self):
         # 对关键词进行过滤
-        self.apsa = 0
         apsa = self.request.query_params.get('apsa')
 
         if self.action == 'list':
             if apsa == '1':
                 self.apsa = 1
-                return self.queryset.filter(is_apsa=1)
+                apsa_id_list = [x.asset_id for x in Apsa.objects.all()]
+                return self.queryset.filter(id__in=apsa_id_list)
             else:
-                return self.queryset.filter(is_apsa=0)
+                self.apsa = 0
+                bulk_id_list = [x.asset_id for x in Bulk.objects.all()]
+                return self.queryset.filter(id__in=bulk_id_list)
         else:
             return self.queryset
 
     # 根据is_apsa使用不同序列化器
     def get_serializer_class(self):
         if self.action == 'list':
-            is_apsa = self.queryset[0].is_apsa
+            is_apsa = self.apsa
         else:
             pk = self.kwargs.get('pk')
             is_apsa = Asset.objects.get(id=pk).is_apsa
@@ -705,7 +705,7 @@ class AssetModelView(UpdateListRetrieveViewSet):
     def update(self, request, pk):
         rtu_name = request.data.get('rtu_name')
         comment = request.data.get('comment')
-        engineer_id = request.data.get('engineer_id')
+        engineer_id = int(request.data.get('engineer_id'))
         asset = Asset.objects.get(id=pk)
         bulk = None
         apsa = None
@@ -775,7 +775,7 @@ class AssetModelView(UpdateListRetrieveViewSet):
             asset.comment = comment
         asset.rtu_name = rtu_name
         site = Site.objects.get(asset=asset)
-        site.engineer_id = engineer_id
+        site.engineer = User.objects.get(id=engineer_id)
         try:
             if bulk:
                 bulk.save()

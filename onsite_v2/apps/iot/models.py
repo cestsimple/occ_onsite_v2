@@ -52,7 +52,7 @@ class Bulk(models.Model):
     level_b = models.FloatField(max_length=30, verbose_name='filling标志b', default=6)
     level_c = models.FloatField(max_length=30, verbose_name='filling标志c', default=10)
     level_d = models.FloatField(max_length=30, verbose_name='filling标志d', default=0.5)
-    filling_js = models.BooleanField(default=False, verbose_name='计算filling')
+    filling_js = models.IntegerField(default=0)
 
     class Meta:
         ordering = ['id']

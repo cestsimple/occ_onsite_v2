@@ -14,6 +14,9 @@ class Filling(models.Model):
     quantity = models.FloatField(max_length=20, verbose_name="Filling Quantity")
     confirm = models.IntegerField(verbose_name='确认标志', default=0)
 
+    class Meta:
+        ordering = ['id']
+
 
 class Daily(models.Model):
     """Daily原始数据表"""
@@ -34,9 +37,11 @@ class Daily(models.Model):
     filling = models.FloatField(max_length=20, default=0)
     lin_tot = models.FloatField(max_length=20, default=0)
     flow_meter = models.FloatField(max_length=20, default=0)
-    comment = models.CharField(max_length=200, default='')
     success = models.IntegerField(default=0)
     confirm = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['id']
 
 
 class DailyMod(models.Model):
@@ -57,6 +62,7 @@ class DailyMod(models.Model):
     m3_q7_mod = models.FloatField(max_length=20, default=0)
     lin_tot_mod = models.FloatField(max_length=20, default=0)
     flow_meter_mod = models.FloatField(max_length=20, default=0)
+    comment = models.CharField(max_length=300, default='')
     user = models.CharField(max_length=100, verbose_name="最后修改用户")
 
 
@@ -83,6 +89,9 @@ class Malfunction(models.Model):
     change_date = models.DateTimeField(verbose_name="最后修改时间")
     change_user = models.CharField(max_length=100, verbose_name="最后修改用户")
     confirm = models.IntegerField(verbose_name='确认标志', default=0)
+
+    class Meta:
+        ordering = ['id']
 
 
 class Reason(models.Model):

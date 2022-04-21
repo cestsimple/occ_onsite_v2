@@ -50,6 +50,7 @@ class DailySerializer(serializers.ModelSerializer):
     lin_consume = serializers.SerializerMethodField()
     cooling = serializers.SerializerMethodField()
     mod_id = serializers.SerializerMethodField()
+    comment = serializers.SerializerMethodField()
 
     def get_date(self, obj):
         return obj.date.strftime("%Y-%m-%d")
@@ -131,6 +132,9 @@ class DailySerializer(serializers.ModelSerializer):
             else:
                 return 0
 
+    def get_comment(self, obj):
+        return DailyMod.objects.get(date=obj.date, apsa=obj.apsa).comment
+
     class Meta:
         model = Daily
         exclude = ['apsa', 'h_stpal', 'h_stpdft', 'h_stp400v', 'm3_tot', 'm3_q1', 'm3_peak', 'm3_q5',
@@ -140,7 +144,7 @@ class DailySerializer(serializers.ModelSerializer):
 class DailyModSerializer(serializers.ModelSerializer):
     class Meta:
         model = DailyMod
-        exclude = ['id', 'date', 'apsa']
+        exclude = ['date', 'apsa']
 
 
 class MalfunctionSerializer(serializers.ModelSerializer):

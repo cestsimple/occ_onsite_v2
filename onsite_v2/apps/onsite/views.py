@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.views import View
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 
-from apps.iot.models import Bulk, Apsa, Variable, Record, Asset
+from apps.iot.models import Bulk, Apsa, Variable, Record
 from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet
 from .models import Filling, Daily, DailyMod, Malfunction, Reason
 from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer
@@ -45,7 +45,7 @@ class FillingCalculate(View):
         t_end = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d") + ' 23:59'
 
         # 获取所有需要计算的bulk的variable
-        variables = Variable.objects.filter(asset__bulk__filling_js=True, daily_mark='LEVEL')
+        variables = Variable.objects.filter(asset__bulk__filling_js__gte=1, daily_mark='LEVEL')
 
         for variable in variables:
             records = {}
@@ -503,6 +503,26 @@ class DailyModelView(ListViewSet):
         return self.queryset
 
 
+class DailyOriginView(View):
+    def get(self, request, pk):
+        daily = Daily.objects.get(id=pk)
+        return JsonResponse({
+            'h_prod': daily.h_prod,
+            'h_stpal': daily.h_stpal,
+            'h_stpdft': daily.h_stpdft,
+            'h_stp400v': daily.h_stp400v,
+            'm3_prod': daily.m3_prod,
+            'm3_tot': daily.m3_tot,
+            'm3_q1': daily.m3_q1,
+            'm3_peak': daily.m3_peak,
+            'm3_q5': daily.m3_q5,
+            'm3_q6': daily.m3_q6,
+            'm3_q7': daily.m3_q7,
+            'lin_tot': daily.lin_tot,
+            'flow_meter': daily.flow_meter
+        })
+
+
 class DailyModModelView(RetrieveUpdateViewSet):
     # 查询集
     queryset = DailyMod.objects.all()
@@ -522,7 +542,7 @@ class MalfunctionModelView(ModelViewSet):
     # 指定分页器
     pagination_class = PageNum
     # 权限
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         # 重写，添加条件过滤功能
@@ -597,6 +617,7 @@ class MalfunctionModelView(ModelViewSet):
             return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'status': 200, 'msg': '充液记录创建成功'})
+
 
 class ReasonModelView(ListViewSet):
     # 查询集

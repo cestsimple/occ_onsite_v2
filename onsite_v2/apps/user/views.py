@@ -13,11 +13,6 @@ from .models import User
 from .serializer import UserSerializer
 
 
-class IndexView(View):
-    def get(self, request):
-        return render(request, 'index.html')
-
-
 class AdminCreateView(View):
     def get(self, request):
         if User.objects.filter(username='admin').count() != 0:
@@ -37,11 +32,6 @@ class AdminCreateView(View):
         return JsonResponse({'status': 200, 'msg': '创建成功'})
 
 
-class LoginView(View):
-    def get(self, request):
-        return render(request, 'login.html')
-
-
 class UserView(ModelViewSet):
     # 查询集
     queryset = User.objects.all()
@@ -53,7 +43,7 @@ class UserView(ModelViewSet):
     permission_classes = [IsAdminUser]
 
     def get_queryset(self):
-        query_params = self.query_params
+        query_params = self.request.query_params
         engineer = query_params.get('engineer')
 
         if engineer:

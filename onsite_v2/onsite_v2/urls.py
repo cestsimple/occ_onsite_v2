@@ -16,10 +16,12 @@ Including another URLconf
 from django.conf.urls import url
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import TemplateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     url(r'^', include(('apps.iot.urls', 'iot'), namespace='iot')),
     url(r'^', include(('apps.user.urls', 'users'), namespace='users')),
     url(r'^', include(('apps.onsite.urls', 'onsite'), namespace='onsite')),
+    url(r'^$', TemplateView.as_view(template_name="index.html")),
 ]

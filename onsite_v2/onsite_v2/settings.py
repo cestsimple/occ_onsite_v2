@@ -62,7 +62,7 @@ ROOT_URLCONF = 'onsite_v2.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': ['frontend/dist'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -73,23 +73,23 @@ TEMPLATES = [
             ],
         },
     },
-    {
-        # 配置Jinja2模板
-        'BACKEND': 'django.template.backends.jinja2.Jinja2',
-        # 新增模板文件夹
-        'DIRS': [os.path.join(BASE_DIR, 'templates'), ],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-            ],
-            # 补充Jinja2模板规则环境
-            'environment': 'utils.jinja2_env.jinja2_environment',
-        },
-    },
+    # {
+    #     # 配置Jinja2模板
+    #     'BACKEND': 'django.template.backends.jinja2.Jinja2',
+    #     # 新增模板文件夹
+    #     'DIRS': [os.path.join(BASE_DIR, 'templates'), ],
+    #     'APP_DIRS': True,
+    #     'OPTIONS': {
+    #         'context_processors': [
+    #             'django.template.context_processors.debug',
+    #             'django.template.context_processors.request',
+    #             'django.contrib.auth.context_processors.auth',
+    #             'django.contrib.messages.context_processors.messages',
+    #         ],
+    #         # 补充Jinja2模板规则环境
+    #         'environment': 'utils.jinja2_env.jinja2_environment',
+    #     },
+    # },
 ]
 
 WSGI_APPLICATION = 'onsite_v2.wsgi.application'
@@ -163,7 +163,8 @@ USE_TZ = False
 STATIC_URL = '/static/'
 # 添加静态文件夹
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),
+    os.path.join(BASE_DIR, 'frontend/dist'),
+    os.path.join(BASE_DIR, 'frontend/dist/static')
 ]
 
 
@@ -195,6 +196,11 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:8000',
     'http://127.0.0.1:8080',
     'http://localhost:8080',
+    'http://10.231.3.21:8080',
+    'http://10.231.3.21:80'
+    'http://127.0.0.1:80',
+    'http://127.0.0.1:80',
+    'http://localhost:80',
 ]
 
 CORS_ALLOW_CREDENTIALS = True

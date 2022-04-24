@@ -570,6 +570,19 @@ class ApsaModelView(UpdateListRetrieveViewSet):
     # 分页器
     pagination_class = PageNum
 
+    # 重写方法，添加过滤
+    def get_queryset(self):
+        # 对关键词进行过滤
+        name = self.request.query_params.get('name')
+
+        if name:
+            name = name.upper()
+            return self.queryset.filter(
+                Q(asset__rtu_name__contains=name) | Q(asset__site__name__contains=name)
+            )
+        else:
+            return self.queryset
+
     def update(self, request, pk):
         rtu_name = request.data.get('rtu_name')
         engineer = request.data.get('engineer')
@@ -620,6 +633,19 @@ class BulkModelView(UpdateListRetrieveViewSet):
     permission_classes = [IsAuthenticated]
     # 分页器
     pagination_class = PageNum
+
+    # 重写方法，添加过滤
+    def get_queryset(self):
+        # 对关键词进行过滤
+        name = self.request.query_params.get('name')
+
+        if name:
+            name = name.upper()
+            return self.queryset.filter(
+                Q(asset__rtu_name__contains=name) | Q(asset__site__name__contains=name)
+            )
+        else:
+            return self.queryset
 
     def update(self, request, pk):
         tank_size = request.data.get('tank_size')

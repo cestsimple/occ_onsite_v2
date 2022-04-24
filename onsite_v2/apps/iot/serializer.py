@@ -1,4 +1,3 @@
-from django.db import transaction
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 from .models import Site, Apsa, Bulk, Variable, Asset
@@ -26,6 +25,15 @@ class ApsaSerializer(ModelSerializer):
     """
     APSA序列化器
     """
+    asset_name = serializers.SerializerMethodField()
+    site_name = serializers.SerializerMethodField()
+
+    def get_asset_name(self, obj):
+        return Asset.objects.get(apsa=obj).name
+
+    def get_site_name(self, obj):
+        return Site.objects.get(asset__apsa=obj).name
+
     class Meta:
         model = Apsa
         exclude = ('asset',)
@@ -35,6 +43,14 @@ class BulkSerializer(ModelSerializer):
     """
     Bulk序列化器
     """
+    asset_name = serializers.SerializerMethodField()
+    site_name = serializers.SerializerMethodField()
+
+    def get_asset_name(self, obj):
+        return Asset.objects.get(bulk=obj).name
+
+    def get_site_name(self, obj):
+        return Site.objects.get(asset__bulk=obj).name
 
     class Meta:
         model = Bulk

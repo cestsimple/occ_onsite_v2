@@ -187,7 +187,7 @@ REST_FRAMEWORK = {
         ),
 }
 JWT_AUTH = {
-    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=1),
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=10),
     'JWT_RESPONSE_PAYLOAD_HANDLER': 'utils.jwt_response.jwt_response_payload_handler',
 }
 
@@ -197,7 +197,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:8080',
     'http://localhost:8080',
     'http://10.231.3.21:8080',
-    'http://10.231.3.21:80'
+    'http://10.231.3.21:80',
     'http://127.0.0.1:80',
     'http://127.0.0.1:80',
     'http://localhost:80',

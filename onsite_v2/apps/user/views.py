@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.views import View
 from rest_framework import status
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
@@ -40,16 +40,20 @@ class UserView(ModelViewSet):
     # 指定分页器
     pagination_class = PageNum
     # 权限
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         query_params = self.request.query_params
         engineer = query_params.get('engineer')
+        region = query_params.get('region')
 
+        query = self.queryset
         if engineer:
-            return self.queryset.filter(~Q(group='occ'))
+            query = query.filter(~Q(group='occ'))
+        if region:
+            query = query.filter(region=region)
 
-        return self.queryset
+        return query
 
     def update(self, request, pk):
         username = request.data.get('username')

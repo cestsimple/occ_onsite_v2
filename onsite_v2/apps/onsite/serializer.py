@@ -159,7 +159,9 @@ class MalfunctionSerializer(serializers.ModelSerializer):
         return Asset.objects.get(apsa=obj.apsa).rtu_name
 
     def get_avg_con(self, obj):
-        return round(obj.stop_consumption / obj.stop_hour, 2)
+        if obj.stop_hour:
+            return round(obj.stop_consumption / obj.stop_hour, 2)
+        return 0
 
     class Meta:
         model = Malfunction
@@ -170,6 +172,7 @@ class MalfunctionSerializer(serializers.ModelSerializer):
             'reason_l2': {'allow_blank': True},
             'reason_l3': {'allow_blank': True},
             'reason_l4': {'allow_blank': True},
+            'stop_alarm': {'allow_blank': True},
             'reason_detail_1': {'allow_blank': True},
             'reason_detail_2': {'allow_blank': True},
             'mt_comment': {'allow_blank': True},

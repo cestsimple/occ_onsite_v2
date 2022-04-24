@@ -12,7 +12,7 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 
 from apps.iot.models import Bulk, Apsa, Variable, Record
 from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet
-from .models import Filling, Daily, DailyMod, Malfunction, Reason
+from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail
 from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer
 from utils import jobs
 from utils.pagination import PageNum
@@ -309,7 +309,6 @@ class DailyCalculate(View):
         if not self.error:
             # 添加成功标志位, 更新备注信息
             d_res['success'] = 1
-            d_res['comment'] = ''
 
             # Daily写入数据库
             Daily.objects.update_or_create(
@@ -318,7 +317,6 @@ class DailyCalculate(View):
             )
         else:
             # 添加错误变量信息
-            d_res['comment'] = '报错变量:' + f"{'|'.join(self.error_variables)}"
             Daily.objects.update_or_create(
                 apsa=self.apsa, date=self.t_start,
                 defaults=d_res
@@ -328,6 +326,8 @@ class DailyCalculate(View):
         res = {
             'user': 'SYSTEM'
         }
+        if self.error:
+            res['comment'] = '报错变量:' + f"{'|'.join(self.error_variables)}"
         apsa = self.apsa
         if self.apsa.daily_js == 2:
             res['lin_tot_mod'] = self.daily_res['lin_tot']
@@ -412,7 +412,9 @@ class FillingModelView(ModelViewSet):
                 Q(bulk__asset__rtu_name__contains=name) | Q(bulk__asset__site__name__contains=name)
             )
         if start and end:
-            self.queryset = self.queryset.filter(time_1__range=[start + ' 00:00', end + ' 23:59'])
+            start = start.replace('+', '')
+            end = end.replace('+', '')
+            self.queryset = self.queryset.filter(time_1__range=[start, end])
 
         return self.queryset
 
@@ -498,7 +500,9 @@ class DailyModelView(ListViewSet):
                 Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
             )
         if start and end:
-            self.queryset = self.queryset.filter(date__range=[start + ' 00:00', end + ' 23:59'])
+            start = start.replace('+', '')
+            end = end.replace('+', '')
+            self.queryset = self.queryset.filter(date__range=[start, end])
 
         return self.queryset
 
@@ -563,7 +567,9 @@ class MalfunctionModelView(ModelViewSet):
                 Q(apsa__asset__rtu_name__contains=name)|Q(apsa__asset__site__name__contains=name)
             )
         if start and end:
-            self.queryset = self.queryset.filter(t_start__range=[start + ' 00:00', end + ' 23:59'])
+            start = start.replace('+', '')
+            end = end.replace('+', '')
+            self.queryset = self.queryset.filter(t_start__range=[start, end])
 
         return self.queryset
 
@@ -650,6 +656,56 @@ class ReasonModelView(ListViewSet):
             # 提供下级原因
             try:
                 parent_model = Reason.objects.get(id=parent)  # 查询下级原因的父级
+                sub_model_list = parent_model.subs.all()
+
+                # 序列化下级原因数据
+                sub_list = []
+                for sub_model in sub_model_list:
+                    sub_list.append({'id': sub_model.id, 'cname': sub_model.cname})
+
+                sub_data = {
+                    'id': parent_model.id,  # 父级pk
+                    'cname': parent_model.cname,  # 父级name
+                    'subs': sub_list  # 父级的子集
+                }
+            except Exception as e:
+                print(e)
+                return JsonResponse({'code': 400, 'errmsg': '下级原因数据错误'})
+
+            return JsonResponse({'code': 200, 'errmsg': 'OK', 'sub_data': sub_data})
+
+
+class ReasonDetailModelView(ListViewSet):
+    # 查询集
+    queryset = Malfunction.objects.all()
+    # 序列化器
+    serializer_class = MalfunctionSerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    # permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        query = request.query_params
+        parent = query.get('parent')
+
+        if not parent:
+            try:
+                # 查询一级原因
+                reason_level_1 = ReasonDetail.objects.filter(parent=None)
+                # 序列化一级原因
+                reason_list = []
+                for reason in reason_level_1:
+                    reason_list.append({'id': reason.id, 'cname': reason.cname})
+            except Exception as e:
+                print(e)
+                return JsonResponse({'code': 400, 'errmsg': '一级原因数据错误'})
+            # 响应一级原因数据
+            return JsonResponse({'code': 200, 'errmsg': 'OK', 'reason_list': reason_list})
+        else:
+            # 提供下级原因
+            try:
+                parent_model = ReasonDetail.objects.get(id=parent)  # 查询下级原因的父级
                 sub_model_list = parent_model.subs.all()
 
                 # 序列化下级原因数据

@@ -26,4 +26,6 @@ urlpatterns = [
 
     # reason
     url(r'^api/malfunction/reason/$', views.ReasonModelView.as_view({'get': 'list'})),
+    # reason-detail
+    url(r'^api/malfunction/reason/detail/$', views.ReasonDetailModelView.as_view({'get': 'list'})),
 ]

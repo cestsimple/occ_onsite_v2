@@ -98,3 +98,26 @@ class Record(models.Model):
     time = models.DateTimeField(verbose_name='记录时间', null=False)
     value = models.FloatField(max_length=100, verbose_name='记录值', default=0)
     filling_mark = models.IntegerField(verbose_name='充液标志', default=0)
+
+
+class OriginAssetData(models.Model):
+    """老OCC资产登记信息"""
+    id = models.AutoField(primary_key=True)
+    site_name = models.CharField(max_length=100)
+    asset_name = models.CharField(max_length=100)
+    uuid = models.CharField(max_length=100)
+    rtu_name = models.CharField(max_length=100)
+    norminal = models.IntegerField(default=0, null=True)
+    temp = models.IntegerField(default=0, null=True)
+    fin = models.CharField(max_length=100, null=True)
+    file_name = models.CharField(max_length=100, null=True)
+    stp_400v = models.CharField(max_length=100, null=True)
+    vap_max = models.IntegerField(default=0, null=True)
+    vap_type = models.CharField(max_length=100, null=True)
+    tank_name = models.CharField(max_length=100, null=True)
+    tank_size = models.FloatField(default=0, null=True)
+    levela = models.FloatField(default=0, null=True)
+    levelb = models.FloatField(default=0, null=True)
+    levelc = models.FloatField(default=0, null=True)
+    leveld = models.FloatField(default=0, null=True)
+    is_bulk = models.IntegerField(default=0, null=True)

@@ -85,7 +85,9 @@ class DailySerializer(serializers.ModelSerializer):
         return round(obj.m3_prod + mod.m3_prod_mod, 2)
 
     def get_avg_prod(self, obj):
-        return round(self.get_m3_prod(obj) / self.get_h_prod(obj), 2)
+        if self.get_h_prod(obj):
+            return round(self.get_m3_prod(obj) / self.get_h_prod(obj), 2)
+        return 0
 
     def get_cus_consume(self, obj):
         mod = DailyMod.objects.get(date=obj.date, apsa=obj.apsa)

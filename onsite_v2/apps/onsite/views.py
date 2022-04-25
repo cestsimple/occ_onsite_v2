@@ -114,7 +114,6 @@ class FillingCalculate(View):
                         'level_1': records_data[start],
                         'level_2': records_data[start + last],
                         'quantity': round(quantity, 2),
-                        'is_deleted': 0
                     }
                 )
 
@@ -208,7 +207,7 @@ class DailyCalculate(View):
         t_start = self.t_start
 
         # 查询所有需要计算的Apsa
-        apsas = Apsa.objects.filter(daily_js__gte=1).order_by('daily_js')
+        apsas = Apsa.objects.filter(daily_js__gte=1, asset__confirm=1).order_by('daily_js')
 
         for apsa in apsas:
             # 传递apsa全局使用
@@ -231,9 +230,28 @@ class DailyCalculate(View):
             self.generate_malfunction()
             # 写入daily
             self.generate_daily()
-
             # 写入daily_mod表
             self.generate_daily_mod()
+
+            # 清空全局变量
+            self.error = 0
+            self.error_variables = []
+            self.daily_res = {
+                'h_prod': -1,
+                'h_stpal': -1,
+                'h_stpdft': -1,
+                'h_stp400v': -1,
+                'm3_prod': -1,
+                'm3_tot': -1,
+                'm3_q1': -1,
+                'm3_peak': -1,
+                'm3_q5': -1,
+                'm3_q6': -1,
+                'm3_q7': -1,
+                'filling': 0,
+                'lin_tot': 0,
+                'flow_meter': 0,
+            }
 
         # 更新Job状态
         jobs.update('ONSITE_DAILY', 'OK')
@@ -248,7 +266,7 @@ class DailyCalculate(View):
         variables = Variable.objects.filter(asset__apsa=self.apsa).filter(~Q(daily_mark=''))
         for v in variables:
             try:
-                # 查询其所有record
+                # 查询其所有daily_mark数据
                 data_today = Record.objects.get(variable__id=v.id, time=self.t_end).value
                 data_yesterday = Record.objects.get(variable__id=v.id, time=self.t_start).value
                 # 根据时间，计算该daily_mark的值
@@ -256,7 +274,7 @@ class DailyCalculate(View):
             except Exception as e:
                 # 若查数据缺失，错误标志置1
                 self.error = 1
-                self.error_variables.append(v.name)
+                self.error_variables.append(v.name.replace('M3_', '').replace('H_', ''))
 
     def get_lin_tot_simple(self):
         """
@@ -277,16 +295,22 @@ class DailyCalculate(View):
                 x.quantity for x in Filling.objects.filter(bulk=bulk, time_1__range=[t_start, t_end])
             ])
             # 计算储罐首尾液位差量
-            l_0 = Record.objects.filter(variable__asset__bulk=bulk).get(time=t_start + ' 00:00:00').value
-            l_1 = Record.objects.filter(variable__asset__bulk=bulk).get(time=t_end + ' 00:00:00').value
-            lin_bulks += (l_0 - l_1) / 100 * bulk.tank_size * 1000  # 单位:升(液态)
+            try:
+                l_0 = Record.objects.filter(variable__asset__bulk=bulk).get(time=t_start + ' 00:00:00').value
+                l_1 = Record.objects.filter(variable__asset__bulk=bulk).get(time=t_end + ' 00:00:00').value
+                lin_bulks += (l_0 - l_1) / 100 * bulk.tank_size * 1000  # 单位:升(液态)
+            except Exception:
+                l_0 = l_1 = lin_bulks = 0
+                self.error = 1
+                self.error_variables.append('lin_bulk')
+            # 添加液位差数据至res中，以便计入数据库
 
         # 计算lin_tot,单位标立 = 储罐消耗 + 充液
         lin_tot = round((filling_quantity + lin_bulks) / 1000 * 650 * (273.15 + self.apsa.temperature) / 273.15, 2)
 
         # 保存数据
         self.daily_res['lin_tot'] = lin_tot
-        self.daily_res['filling'] = filling_quantity
+        self.daily_res['filling'] = round(filling_quantity, 2)
 
     def get_lin_tot_complex(self):
         """
@@ -297,8 +321,8 @@ class DailyCalculate(View):
         cooling_fixed = self.apsa.cooling_fixed
 
         # 根据cooling反推lin_tot，再加上停机用液和Peak
-        lin_tot = round(self.res['m3_prod'] * cooling_fixed / 100, 2)
-        lin_tot += self.res['m3_q6'] + self.res['m3_q7'] + self.res['m3_peak']
+        lin_tot = round(self.daily_res['m3_prod'] * cooling_fixed / 100, 2)
+        lin_tot += self.daily_res['m3_q6'] + self.daily_res['m3_q7'] + self.daily_res['m3_peak']
 
         # 保存数据
         self.daily_res['lin_tot'] = lin_tot
@@ -306,36 +330,47 @@ class DailyCalculate(View):
     def generate_daily(self):
         # 生成成功daily
         d_res = self.daily_res
+        d_res['success'] = 0
+
+        # 添加成功标志位
         if not self.error:
-            # 添加成功标志位, 更新备注信息
             d_res['success'] = 1
 
-            # Daily写入数据库
-            Daily.objects.update_or_create(
-                apsa=self.apsa, date=self.t_start,
-                defaults=d_res,
-            )
-        else:
-            # 添加错误变量信息
-            Daily.objects.update_or_create(
-                apsa=self.apsa, date=self.t_start,
-                defaults=d_res
-            )
+        # Daily写入数据库
+        Daily.objects.update_or_create(
+            apsa=self.apsa, date=self.t_start,
+            defaults=d_res
+        )
 
     def generate_daily_mod(self):
         res = {
             'user': 'SYSTEM'
         }
         if self.error:
-            res['comment'] = '报错变量:' + f"{'|'.join(self.error_variables)}"
-        apsa = self.apsa
-        if self.apsa.daily_js == 2:
-            res['lin_tot_mod'] = self.daily_res['lin_tot']
-            apsa = Apsa.objects.filter(id=self.apsa.daily_bind)
-        DailyMod.objects.update_or_create(
-            apsa=apsa, date=self.t_start,
-            defaults=res
-        )
+            # 获取报错变量信息，并对数据长度进行检查
+            comment = '报错变量:' + f"{'|'.join(self.error_variables)}"
+            if len(comment) > 300:
+                comment = comment[:300]
+            res['comment'] = comment
+
+        try:
+            # 创建APSA自己的MOD数据
+            DailyMod.objects.update_or_create(
+                apsa=self.apsa, date=self.t_start,
+                defaults=res
+            )
+
+            # 若为从气站，需要创建第两条mod数据，更新主机的mod数据
+            if self.apsa.daily_js == 2:
+                apsa = Apsa.objects.get(id=self.apsa.daily_bind)
+                DailyMod.objects.update_or_create(
+                    apsa=apsa, date=self.t_start,
+                    defaults={
+                        'lin_tot_mod': -self.daily_res['lin_tot']
+                    }
+                )
+        except Exception as e:
+            print(e)
 
     def generate_malfunction(self):
         """生成停机Malfunction"""
@@ -346,19 +381,19 @@ class DailyCalculate(View):
                 default = {
                     'stop_label': 'AL',
                     'stop_consumption': d_res['m3_q6'],
-                    'stop_time': d_res['h_stpal'],
+                    'stop_hour': d_res['h_stpal'],
                 }
             elif d_res['h_stpdft']:
                 default = {
                     'stop_label': 'DFT',
                     'stop_consumption': 0,
-                    'stop_time': d_res['h_stpdft'],
+                    'stop_hour': d_res['h_stpdft'],
                 }
             elif d_res['h_stp400v']:
                 default = {
                     'stop_label': '400V',
                     'stop_consumption': d_res['m3_q7'],
-                    'stop_time': d_res['h_stp400v'],
+                    'stop_hour': d_res['h_stp400v'],
                 }
             # 添加停机信息
             default['t_end'] = self.t_start
@@ -473,7 +508,7 @@ class FillingModelView(ModelViewSet):
 
 class DailyModelView(ListViewSet):
     # 查询集
-    queryset = Daily.objects.all()
+    queryset = Daily.objects.all().order_by('apsa__onsite_series')
     # 序列化器
     serializer_class = DailySerializer
     # 指定分页器

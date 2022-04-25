@@ -11,7 +11,7 @@ from rest_framework.response import Response
 
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
-from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record
+from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record, OriginAssetData
 from datetime import datetime, timedelta
 from utils import jobs
 from .serializer import SiteSerializer, ApsaSerializer, BulkSerializer, VariableSerializer, AssetApsaSerializer, \
@@ -489,10 +489,28 @@ class RecordData(View):
 
     def refresh_main(self):
         h = get_cognito()
-        # 获取apsa对应变量
-        self.variables = [x for x in Variable.objects.filter(asset__apsa__daily_js__gte=1).filter(~Q(daily_mark=''))]
-        # 获取bulk对应变量
-        self.variables += [j for j in Variable.objects.filter(asset__bulk__filling_js__gte=1).filter(~Q(daily_mark=''))]
+        # 遍历asset，获取确认过的再计算
+        assets = [x for x in Asset.objects.filter(confirm=1, tags='onsite')]
+        total_apsa = 0
+        total_bulk = 0
+        # 获取assets对应变量,去除没有dailymark的
+        for asset in assets:
+            variables = [x for x in Variable.objects.filter(asset=asset).filter(~Q(daily_mark=''))]
+            if asset.is_apsa and Apsa.objects.get(asset=asset).daily_js:
+                if len(variables) == 11 or len(variables) == 12:
+                    self.variables += variables
+                    total_apsa += 1
+                else:
+                    print(f"APSA variables总数验证错误：\n asset:{asset.rtu_name} 变量数:{len(variables)} \n: 变量名如下：")
+                    for i in variables:
+                        print(i.name)
+            elif not asset.is_apsa and Bulk.objects.get(asset=asset).filling_js:
+                if len(variables) == 1:
+                    self.variables += variables
+                    total_bulk += 1
+                else:
+                    print(f"BULK variables总数验证错误：\n asset:{asset.rtu_name}")
+        print(f"有{total_apsa}个apsa资产和{total_bulk}个bulk资产，共:{len(self.variables)}个变量")
         # 分发任务至子线程
         multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.variables, h))
         # 更新job状态
@@ -509,31 +527,34 @@ class RecordData(View):
             url = f'{URL}/assets/{variable.asset.uuid}/variables/{variable.uuid}/' \
                   f'timeseries?start={t_start}&end={t_end}&limit={max_num}'
 
-            res = requests.get(url, headers=h).json()['timeseries']
+            try:
+                res = requests.get(url, headers=h).json()['timeseries']
 
-            daily_mark_list = [
-                'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
-                'H_STPDFT', 'H_STP400V', 'M3_PEAK',
-            ]
-            for i in res.keys():
-                time_array = time.localtime(int(i[:-3]))
-                t = time.strftime("%Y-%m-%d %H:%M", time_array)
-                # 过滤
-                value = res[i]
-                if variable.daily_mark == 'LEVEL' and not t.endswith('0'):
-                    # 若是level，不要15分钟的点
-                    pass
-                elif variable.daily_mark in daily_mark_list and not t.endswith('00:00'):
-                    # 若是M3_PEAK，只要零点的
-                    pass
-                else:
-                    Record.objects.update_or_create(
-                        variable=variable, time=t,
-                        defaults={
-                            'time': t,
-                            'value': value,
-                        }
-                    )
+                daily_mark_list = [
+                    'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
+                    'H_STPDFT', 'H_STP400V', 'M3_PEAK',
+                ]
+                for i in res.keys():
+                    time_array = time.localtime(int(i[:-3]))
+                    t = time.strftime("%Y-%m-%d %H:%M", time_array)
+                    # 过滤
+                    value = res[i]
+                    if variable.daily_mark == 'LEVEL' and not t.endswith('0'):
+                        # 若是level，不要15分钟的点
+                        pass
+                    elif variable.daily_mark in daily_mark_list and not t.endswith('00:00'):
+                        # 若是M3_PEAK，只要零点的
+                        pass
+                    else:
+                        Record.objects.update_or_create(
+                            variable=variable, time=t,
+                            defaults={
+                                'time': t,
+                                'value': value,
+                            }
+                        )
+            except Exception as e:
+                print(e)
 
 
 class SiteModelView(UpdateListRetrieveViewSet):
@@ -814,3 +835,68 @@ class AssetModelView(UpdateListRetrieveViewSet):
             return Response('数据库保存错误', status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'status': 200, 'msg': '保存成功'})
+
+
+class AddOriginDataView(View):
+    def get(self, request):
+        data = OriginAssetData.objects.all()
+        for row in data:
+            asset = Asset.objects.filter(uuid=row.uuid)
+            if asset.count() != 1:
+                print(f'ERROR: UUID错误{row.uuid}')
+            else:
+                asset = asset[0]
+                asset.rtu_name = row.rtu_name
+                asset.confirm = 1
+
+                if row.is_bulk:
+                    try:
+                        bulk = Bulk.objects.get(asset=asset)
+                        bulk.tank_size = row.tank_size
+                        bulk.level_a = row.levela
+                        bulk.level_b = row.levelb
+                        bulk.level_c = row.levelc
+                        bulk.level_d = row.leveld
+                        bulk.filling_js = 1
+                    except Exception as e:
+                        if 'TOT' not in row.tank_name:
+                            print(e)
+                            print(asset.id)
+                            print('-' * 100)
+                        asset.confirm = 0
+                else:
+                    try:
+                        apsa = Apsa.objects.get(asset=asset)
+                        apsa.temperature = row.temp
+                        if row.vap_max:
+                            apsa.vap_max = row.vap_max
+                        if row.fin:
+                            apsa.facility_fin = row.fin
+                        if row.vap_type:
+                            apsa.vap_type = row.vap_type
+                        apsa.norminal_flow = row.norminal
+                        apsa.daily_js = 1
+                        variables = Variable.objects.filter(asset=asset, daily_mark='H_STP400V')
+                        if variables.count() == 2:
+                            for v in variables:
+                                if v.name != row.stp_400v:
+                                    v.daily_mark = ''
+                                    v.save()
+                    except Exception as e:
+                        print(e)
+                        print(asset.id)
+                        print('-' * 100)
+                        asset.confirm = 0
+                        apsa.daily_js = 0
+
+                try:
+                    asset.save()
+                    if row.is_bulk:
+                        bulk.save()
+                    else:
+                        apsa.save()
+                except Exception as e:
+                    print(e)
+                    print(asset.id)
+                    print('-' * 100)
+        return JsonResponse({'status': 200})

@@ -14,6 +14,7 @@ urlpatterns = [
 
     # daily
     url(r'^daily/$', views.DailyModelView.as_view({'get': 'list'})),
+    url(r'^daily/(?P<pk>\d+)/$', views.DailyModelView.as_view({'put': 'update'})),
     # daily_mod
     url(r'^daily/mod/(?P<pk>\d+)/$', views.DailyModModelView.as_view({'get': 'retrieve', 'put': 'update'})),
     # daily_origin

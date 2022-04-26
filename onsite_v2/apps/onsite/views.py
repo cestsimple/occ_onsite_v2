@@ -11,7 +11,7 @@ from django.views import View
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 
 from apps.iot.models import Bulk, Apsa, Variable, Record, Site
-from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet
+from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet, ListUpdateViewSet
 from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail
 from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer
 from utils import jobs
@@ -533,7 +533,7 @@ class FillingModelView(ModelViewSet):
         daily.save()
 
 
-class DailyModelView(ListViewSet):
+class DailyModelView(ListUpdateViewSet):
     # 查询集
     queryset = Daily.objects.order_by('apsa__asset__rtu_name', 'apsa__onsite_series')
     # 序列化器
@@ -567,6 +567,13 @@ class DailyModelView(ListViewSet):
             self.queryset = self.queryset.filter(date__range=[start, end])
 
         return self.queryset
+
+    def update(self, request, pk):
+        daily = Daily.objects.get(id=pk)
+        daily.confirm = 1
+        daily.success = 1
+        daily.save()
+        return Response({'status': 200, 'msg': '修改Daily记录成功'})
 
 
 class DailyOriginView(View):

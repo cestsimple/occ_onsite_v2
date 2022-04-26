@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.views import View
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 
-from apps.iot.models import Bulk, Apsa, Variable, Record
+from apps.iot.models import Bulk, Apsa, Variable, Record, Site
 from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet
 from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail
 from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer
@@ -157,17 +157,17 @@ class DailyCalculate(View):
         self.error = 0
         self.error_variables = []
         self.daily_res = {
-            'h_prod': -1,
-            'h_stpal': -1,
-            'h_stpdft': -1,
-            'h_stp400v': -1,
-            'm3_prod': -1,
-            'm3_tot': -1,
-            'm3_q1': -1,
-            'm3_peak': -1,
-            'm3_q5': -1,
-            'm3_q6': -1,
-            'm3_q7': -1,
+            'h_prod': 0,
+            'h_stpal': 0,
+            'h_stpdft': 0,
+            'h_stp400v': 0,
+            'm3_prod': 0,
+            'm3_tot': 0,
+            'm3_q1': 0,
+            'm3_peak': 0,
+            'm3_q5': 0,
+            'm3_q6': 0,
+            'm3_q7': 0,
             'filling': 0,
             'lin_tot': 0,
             'flow_meter': 0,
@@ -467,8 +467,7 @@ class FillingModelView(ModelViewSet):
         try:
             tank_size = float(Bulk.objects.get(id=bulk).tank_size)
             quantity = round((level_2 - level_1) / 100 * tank_size * 1000, 2)
-
-            Filling.objects.create(
+            filling = Filling(
                 bulk_id=int(bulk),
                 time_1=time_1,
                 time_2=time_2,
@@ -476,6 +475,8 @@ class FillingModelView(ModelViewSet):
                 level_2=level_2,
                 quantity=quantity
             )
+            self.update_lin_tot(filling, quantity)
+            filling.save()
         except DatabaseError as e:
             return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
 
@@ -498,12 +499,38 @@ class FillingModelView(ModelViewSet):
             filling.time_2 = time_2
             filling.level_1 = level_1
             filling.level_2 = level_2
+            self.update_lin_tot(filling, quantity - filling.quantity)
             filling.quantity = quantity
             filling.save()
         except DatabaseError as e:
             return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({'status': 200, 'msg': '充液记录修改成功'})
+        return Response({'status': 200, 'msg': '修改充液记录成功'})
+
+    def destroy(self, request, *args, **kwargs):
+        filling = self.get_object()
+        diff = filling.quantity
+        try:
+            self.update_lin_tot(filling, -diff)
+            filling.delete()
+        except Exception as e:
+            print(e)
+            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
+        return Response({'status': 200, 'msg': '删除充液记录成功'})
+
+    def update_lin_tot(self, filling, diff):
+        if isinstance(filling.time_1, str):
+            t = filling.time_1.split(' ')[0]
+        else:
+            t = filling.time_1.strftime('%Y-%m-%d')
+        bulk = filling.bulk
+        site = Site.objects.get(asset__bulk=bulk)
+        apsa = Apsa.objects.get(asset__site=site, asset__is_apsa=1)
+        daily = Daily.objects.get(apsa=apsa, date=t)
+        lin_tot = round(diff / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2)
+        daily.lin_tot = round(daily.lin_tot + lin_tot, 2)
+        daily.filling = round(daily.filling + diff)
+        daily.save()
 
 
 class DailyModelView(ListViewSet):
@@ -599,7 +626,7 @@ class MalfunctionModelView(ModelViewSet):
         if name:
             name = name.upper()
             self.queryset = self.queryset.filter(
-                Q(apsa__asset__rtu_name__contains=name)|Q(apsa__asset__site__name__contains=name)
+                Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
             )
         if start and end:
             start = start.replace('+', '')
@@ -667,6 +694,7 @@ class ReasonModelView(ListViewSet):
     serializer_class = MalfunctionSerializer
     # 指定分页器
     pagination_class = PageNum
+
     # 权限
     # permission_classes = [IsAuthenticated]
 
@@ -717,6 +745,7 @@ class ReasonDetailModelView(ListViewSet):
     serializer_class = MalfunctionSerializer
     # 指定分页器
     pagination_class = PageNum
+
     # 权限
     # permission_classes = [IsAuthenticated]
 

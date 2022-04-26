@@ -420,7 +420,7 @@ class DailyCalculate(View):
 
 class FillingModelView(ModelViewSet):
     # 查询集
-    queryset = Filling.objects.all()
+    queryset = Filling.objects.order_by('bulk__asset__rtu_name', 'time_1')
     # 序列化器
     serializer_class = FillingSerializer
     # 指定分页器
@@ -508,7 +508,7 @@ class FillingModelView(ModelViewSet):
 
 class DailyModelView(ListViewSet):
     # 查询集
-    queryset = Daily.objects.all().order_by('apsa__onsite_series')
+    queryset = Daily.objects.order_by('apsa__asset__rtu_name', 'apsa__onsite_series')
     # 序列化器
     serializer_class = DailySerializer
     # 指定分页器

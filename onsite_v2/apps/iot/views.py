@@ -59,7 +59,7 @@ def get_cognito():
         result=token,
         start_time=time_now,
         finish_time=time_expire,
-        )
+    )
     # 返回结果
     h = {
         'Host': 'bos.iot.airliquide.com',
@@ -123,7 +123,7 @@ class SiteData(View):
             sites_iot_dic[content['id']] = content
         sites_db_uuid = [x.uuid for x in Site.objects.all()]
 
-        site_new_uuid = [j for j in sites_iot_dic.keys() if j not in  sites_db_uuid]
+        site_new_uuid = [j for j in sites_iot_dic.keys() if j not in sites_db_uuid]
         site_delete_uuid = [k for k in sites_db_uuid if k not in sites_iot_dic.keys()]
         site_update_uuid = [l for l in sites_db_uuid if l in sites_iot_dic.keys()]
 
@@ -211,7 +211,7 @@ class AssetData(View):
                     rtu_name='',
                     site=site,
                     status=assets_iot_dic[new_asset]['status']['name'],
-                    variables_num = assets_iot_dic[new_asset]['totalVariables'],
+                    variables_num=assets_iot_dic[new_asset]['totalVariables'],
                 )
             )
 
@@ -269,11 +269,11 @@ class TagData(View):
         return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
 
     def refresh_main(self):
-        #h = get_cognito()
-        #multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.assets, h))
+        # h = get_cognito()
+        # multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.assets, h))
 
         # 获取tags后对资产进行分类apsa/bulk
-        #self.sort_asset()
+        # self.sort_asset()
 
         # 更新site工程师
         self.engineer_main()
@@ -296,8 +296,7 @@ class TagData(View):
 
     def sort_asset(self):
         apsa_name_list = [
-            'APSA_T3', 'APSA_T4', 'APSA_T5', 'APSA_T6', 'APSA_T7',
-            'APSA_S6', 'APSA_S7', 'APSA_S8', 'MOS', 'EOX', 'PSA',
+            'APSA_T', 'APSA_S', 'MOS', 'EOX', 'PSA',
         ]
         apsa_list = []
         bulk_list = []
@@ -308,7 +307,7 @@ class TagData(View):
             if Bulk.objects.filter(asset=asset).count() or Apsa.objects.filter(asset=asset).count():
                 name = asset.name
                 # 筛选出制氮机
-                if name in apsa_name_list:
+                if any(ele in name for ele in apsa_name_list) and 'WATER' not in name and 'FLOW' not in name:
                     if name.split('_')[0] == 'APSA':
                         onsite_type = 'APSA'
                         onsite_series = name.split('_')[1]
@@ -428,11 +427,11 @@ class VariableData(View):
                 uuid = variable_create
                 name = variable_iot_dic[variable_create]['name']
                 Variable.objects.create(
-                        uuid=uuid,
-                        name=name,
-                        asset=asset,
-                        daily_mark=self.get_daily_mark(name, asset.name)
-                    )
+                    uuid=uuid,
+                    name=name,
+                    asset=asset,
+                    daily_mark=self.get_daily_mark(name, asset.name)
+                )
 
             # 更新变量
             for variable_update in variable_update_uuid:
@@ -443,8 +442,11 @@ class VariableData(View):
             # 删除变量
             for variable_delete in variable_delete_uuid:
                 v = Variable.objects.get(uuid=variable_delete)
+                v.daily_mark = ''
                 v.confirm = -1
                 v.save()
+                # 删除变量记录
+                Record.objects.filter(variable=v).delete()
 
     def get_daily_mark(self, name, asset_name):
         # Daily标志列表
@@ -882,6 +884,25 @@ class AddOriginDataView(View):
                                 if v.name != row.stp_400v:
                                     v.daily_mark = ''
                                     v.save()
+
+                        # 判断变量是否满足11个或者12个
+                        daily_mark_list = [
+                            'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
+                            'H_STPDFT', 'H_STP400V', 'M3_PEAK',
+                        ]
+                        variables = Variable.objects.filter(asset=asset).filter(~Q(daily_mark=''))
+                        v_daily_mark_list = [x.daily_mark for x in variables]
+                        if variables.count == 11:
+                            if daily_mark_list.sort() != v_daily_mark_list.sort():
+                                apsa.daily_js = 0
+                        elif variables.count == 12:
+                            daily_mark_list.append('FLOW_METER')
+                            if daily_mark_list.sort() != v_daily_mark_list.sort():
+                                apsa.daily_js = 0
+                            daily_mark_list.remove('FLOW_METER')
+                        else:
+                            apsa.daily_js = 0
+
                     except Exception as e:
                         print(e)
                         print(asset.id)

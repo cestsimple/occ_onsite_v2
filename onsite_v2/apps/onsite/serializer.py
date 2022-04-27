@@ -22,7 +22,7 @@ class FillingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Filling
-        exclude = ['confirm']
+        fields = '__all__'
         read_only_fields = ['rtu_name', 'asset_name', 'tank_size', 'id']
         write_only_fields = ['bulk']
 

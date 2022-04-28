@@ -237,17 +237,17 @@ class DailyCalculate(View):
             self.error = 0
             self.error_variables = []
             self.daily_res = {
-                'h_prod': -1,
-                'h_stpal': -1,
-                'h_stpdft': -1,
-                'h_stp400v': -1,
-                'm3_prod': -1,
-                'm3_tot': -1,
-                'm3_q1': -1,
-                'm3_peak': -1,
-                'm3_q5': -1,
-                'm3_q6': -1,
-                'm3_q7': -1,
+                'h_prod': 0,
+                'h_stpal': 0,
+                'h_stpdft': 0,
+                'h_stp400v': 0,
+                'm3_prod': 0,
+                'm3_tot': 0,
+                'm3_q1': 0,
+                'm3_peak': 0,
+                'm3_q5': 0,
+                'm3_q6': 0,
+                'm3_q7': 0,
                 'filling': 0,
                 'lin_tot': 0,
                 'flow_meter': 0,
@@ -420,7 +420,7 @@ class DailyCalculate(View):
 
 class FillingModelView(ModelViewSet):
     # 查询集
-    queryset = Filling.objects.order_by('bulk__asset__rtu_name', 'time_1')
+    queryset = Filling.objects.order_by('confirm', 'bulk__asset__rtu_name', 'time_1')
     # 序列化器
     serializer_class = FillingSerializer
     # 指定分页器
@@ -527,7 +527,10 @@ class FillingModelView(ModelViewSet):
         bulk = filling.bulk
         site = Site.objects.get(asset__bulk=bulk)
         apsa = Apsa.objects.get(asset__site=site, asset__is_apsa=1)
-        daily = Daily.objects.get(apsa=apsa, date=t)
+        try:
+            daily = Daily.objects.get(apsa=apsa, date=t)
+        except Exception:
+            return
         lin_tot = round(diff / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2)
         daily.lin_tot = round(daily.lin_tot + lin_tot, 2)
         daily.filling = round(daily.filling + diff)
@@ -536,7 +539,7 @@ class FillingModelView(ModelViewSet):
 
 class DailyModelView(ListUpdateViewSet):
     # 查询集
-    queryset = Daily.objects.order_by('apsa__asset__rtu_name', 'apsa__onsite_series')
+    queryset = Daily.objects.order_by('confirm', 'apsa__asset__rtu_name', 'apsa__onsite_series')
     # 序列化器
     serializer_class = DailySerializer
     # 指定分页器

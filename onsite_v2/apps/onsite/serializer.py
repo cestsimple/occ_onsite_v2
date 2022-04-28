@@ -140,7 +140,7 @@ class DailySerializer(serializers.ModelSerializer):
     class Meta:
         model = Daily
         exclude = ['apsa', 'h_stpal', 'h_stpdft', 'h_stp400v', 'm3_tot', 'm3_q1', 'm3_peak', 'm3_q5',
-                   'm3_q6', 'm3_q7', 'success', 'confirm']
+                   'm3_q6', 'm3_q7']
 
 
 class DailyModSerializer(serializers.ModelSerializer):

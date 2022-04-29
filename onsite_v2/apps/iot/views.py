@@ -1,3 +1,4 @@
+import http
 import threading
 import time
 import requests
@@ -552,7 +553,7 @@ class RecordData(View):
                             variable=variable, time=t,
                             defaults={
                                 'time': t,
-                                'value': value,
+                                'value': round(value, 2)
                             }
                         )
             except Exception as e:
@@ -580,6 +581,21 @@ class SiteModelView(UpdateListRetrieveViewSet):
             return self.queryset.filter(asset__bulk__id=bulk)
 
         return self.queryset
+
+    def update(self, request, pk):
+        engineer = request.data.get('engineer')
+
+        try:
+            site = Site.objects.get(id=pk)
+            if not engineer:
+                return Response('请求参数错误', status=status.HTTP_400_BAD_REQUEST)
+            site.engineer_id = int(engineer)
+            site.save()
+        except DatabaseError as e:
+            print(e)
+            return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'status': 200, 'msg': '保存成功'})
 
 
 class ApsaModelView(UpdateListRetrieveViewSet):

@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.views import View
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 
-from apps.iot.models import Bulk, Apsa, Variable, Record, Site
+from apps.iot.models import Bulk, Apsa, Variable, Record, Site, Asset
 from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet, ListUpdateViewSet
 from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail
 from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer
@@ -572,12 +572,78 @@ class DailyModelView(ListUpdateViewSet):
 
         return self.queryset
 
+    def list(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            res = self.generate_daily_data(serializer.data)
+            return self.get_paginated_response(res)
+
+        serializer = self.get_serializer(queryset, many=True)
+        res = self.generate_daily_data(serializer.data)
+        return Response(res)
+
     def update(self, request, pk):
         daily = Daily.objects.get(id=pk)
         daily.confirm = 1
         daily.success = 1
         daily.save()
         return Response({'status': 200, 'msg': '修改Daily记录成功'})
+
+    def generate_daily_data(self, daily_origin_list):
+        res_list = []
+        for d in daily_origin_list:
+            # 获取资产，气站
+            site = Site.objects.get(asset__apsa__id=d['apsa'])
+            asset = Asset.objects.get(apsa__id=d['apsa'])
+            apsa = Apsa.objects.get(id=d['apsa'])
+            mod = DailyMod.objects.get(date=d['date'], apsa__id=d['apsa'])
+            # 创建内容
+            h_prod = d['h_prod'] + mod.h_prod_mod
+            h_stop = d['h_stpal']+d['h_stp400v']+d['h_stpdft']+ mod.h_stpal_mod + mod.h_stpdft_mod + mod.h_stp400v_mod
+            h_missing = 24 - h_stop - h_prod
+            m3_prod = d['m3_prod'] + mod.m3_prod_mod
+            avg_prod = m3_prod / h_prod if h_prod else 0
+            cus_consume = d['m3_tot'] + mod.m3_tot_mod
+            avg_consume = cus_consume / 24
+            peak = d['m3_peak'] + mod.m3_peak_mod
+            v_peak = d['m3_q5'] + mod.m3_q5_mod
+            lin_tot = d['lin_tot'] + mod.lin_tot_mod + d['flow_meter'] + mod.flow_meter_mod
+            dif_peak = v_peak - peak
+            lin_consume = d['m3_q6'] + mod.m3_q6_mod + d['m3_q7'] + mod.m3_q7_mod
+            mod_id = mod.id
+            if apsa.cooling_fixed:
+                cooling = apsa.cooling_fixed
+            else:
+                cooling = (lin_tot - peak - lin_consume / m3_prod *100) if m3_prod else 0
+
+            # 添加数据
+            res_list.append({
+                'id': d['id'],
+                'date': d['date'].split(' ')[0],
+                'region': site.engineer.region,
+                'series': apsa.onsite_series,
+                'rtu_name': asset.rtu_name,
+                'norminal': apsa.norminal_flow,
+                'h_prod': round(h_prod, 2),
+                'h_stop': round(h_stop, 2),
+                'h_missing': round(h_missing, 2),
+                'm3_prod': round(m3_prod, 2),
+                'avg_prod': round(avg_prod, 2),
+                'cus_consume': round(cus_consume, 2),
+                'avg_consume': round(avg_consume, 2),
+                'peak': round(peak, 2),
+                'v_peak': round(v_peak, 2),
+                'lin_tot': round(lin_tot, 2),
+                'dif_peak': round(dif_peak, 2),
+                'lin_consume': round(lin_consume, 2),
+                'mod_id': round(mod_id, 2),
+                'cooling': round(cooling, 2),
+                'comment': mod.comment
+            })
+
+        return res_list
 
 
 class DailyOriginView(View):

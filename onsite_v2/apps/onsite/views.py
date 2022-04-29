@@ -539,7 +539,7 @@ class FillingModelView(ModelViewSet):
 
 class DailyModelView(ListUpdateViewSet):
     # 查询集
-    queryset = Daily.objects.order_by('confirm', 'apsa__asset__rtu_name', 'apsa__onsite_series')
+    queryset = Daily.objects.order_by('confirm', 'apsa__onsite_series', 'apsa__asset__rtu_name')
     # 序列化器
     serializer_class = DailySerializer
     # 指定分页器
@@ -616,7 +616,7 @@ class DailyModelView(ListUpdateViewSet):
             if apsa.cooling_fixed:
                 cooling = apsa.cooling_fixed
             else:
-                cooling = (lin_tot - peak - lin_consume / m3_prod *100) if m3_prod else 0
+                cooling = (lin_tot - peak - lin_consume / m3_prod * 100) if m3_prod else 0
 
             # 添加数据
             res_list.append({
@@ -640,6 +640,8 @@ class DailyModelView(ListUpdateViewSet):
                 'lin_consume': round(lin_consume, 2),
                 'mod_id': round(mod_id, 2),
                 'cooling': round(cooling, 2),
+                'filling': round(d['filling'], 2),
+                'vap_max': apsa.vap_max,
                 'comment': mod.comment
             })
 

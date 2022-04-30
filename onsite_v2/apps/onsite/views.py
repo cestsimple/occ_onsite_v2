@@ -643,6 +643,8 @@ class DailyModelView(ListUpdateViewSet):
                 'cooling': round(cooling, 2),
                 'filling': round(d['filling'], 2),
                 'vap_max': apsa.vap_max,
+                'success': d['success'],
+                'confirm': d['confirm'],
                 'comment': mod.comment
             })
 

@@ -473,7 +473,8 @@ class FillingModelView(ModelViewSet):
                 time_2=time_2,
                 level_1=level_1,
                 level_2=level_2,
-                quantity=quantity
+                quantity=quantity,
+                confirm=1
             )
             self.update_lin_tot(filling, quantity)
             filling.save()
@@ -492,7 +493,7 @@ class FillingModelView(ModelViewSet):
         level_1 = float(request.data.get('level_1'))
         level_2 = float(request.data.get('level_2'))
         tank_size = float(Bulk.objects.get(id=bulk).tank_size)
-        quantity = round((level_2 - level_1) / 100 * tank_size * 1000, 2)
+        quantity = round((level_2 - level_1) / 100 * tank_size * 1000, 2)  # 液体L
         # 保存数据
         try:
             filling.time_1 = time_1
@@ -616,7 +617,7 @@ class DailyModelView(ListUpdateViewSet):
             if apsa.cooling_fixed:
                 cooling = apsa.cooling_fixed
             else:
-                cooling = (lin_tot - peak - lin_consume / m3_prod * 100) if m3_prod else 0
+                cooling = ((lin_tot - peak - lin_consume) / m3_prod * 100) if m3_prod else 0
 
             # 添加数据
             res_list.append({

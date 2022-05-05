@@ -615,7 +615,7 @@ class ApsaModelView(UpdateListRetrieveViewSet):
         name = self.request.query_params.get('name')
 
         if name:
-            name = name.upper()
+            name = name.strip().upper()
             return self.queryset.filter(
                 Q(asset__rtu_name__contains=name) | Q(asset__site__name__contains=name)
             )
@@ -679,7 +679,7 @@ class BulkModelView(UpdateListRetrieveViewSet):
         name = self.request.query_params.get('name')
 
         if name:
-            name = name.upper()
+            name = name.strip().upper()
             return self.queryset.filter(
                 Q(asset__rtu_name__contains=name) | Q(asset__site__name__contains=name)
             )
@@ -710,7 +710,7 @@ class BulkModelView(UpdateListRetrieveViewSet):
 class VariableModelView(UpdateListRetrieveViewSet):
     """自定义AssetMixinView"""
     # 查询集
-    queryset = Variable.objects.filter(asset__tags='ONSITE').filter(~Q(daily_mark=''))
+    queryset = Variable.objects.filter(asset__tags='ONSITE')
     # 序列化器
     serializer_class = VariableSerializer
     # 权限
@@ -721,7 +721,7 @@ class VariableModelView(UpdateListRetrieveViewSet):
         asset = query_params.get('asset')
 
         if asset:
-            return self.queryset.filter(asset__id=asset)
+            self.queryset = self.queryset.filter(asset__id=asset)
 
         return self.queryset
 
@@ -770,67 +770,47 @@ class AssetModelView(UpdateListRetrieveViewSet):
     def update(self, request, pk):
         rtu_name = request.data.get('rtu_name')
         comment = request.data.get('comment')
-        engineer_id = int(request.data.get('engineer_id'))
+        apsa_dic = request.data.get('apsa')
+        bulk_dic = request.data.get('bulk')
+        site_dic = request.data.get('site')
         asset = Asset.objects.get(id=pk)
-        bulk = None
-        apsa = None
 
-        if asset.is_apsa:
-            # 获取传入参数
-            onsite_type = request.data.get('onsite_type')
-            onsite_series = request.data.get('onsite_series')
-            facility_fin = request.data.get('facility_fin')
-            daily_js = request.data.get('daily_js')
-            temperature = request.data.get('temperature')
-            vap_max = request.data.get('vap_max')
-            vap_type = request.data.get('vap_type')
-            norminal_flow = request.data.get('norminal_flow')
-            daily_bind = request.data.get('daily_bind')
-            flow_meter = request.data.get('flow_meter')
-            cooling_fixed = request.data.get('cooling_fixed')
+        if apsa_dic:
             # 验证保存数据
             try:
                 # apsa保存
-                apsa = Apsa.objects.get(asset=asset)
-                apsa.onsite_type = onsite_type
-                apsa.onsite_series = onsite_series
-                apsa.daily_js = daily_js
-                apsa.temperature = temperature
-                apsa.norminal_flow = norminal_flow
-                if vap_max:
-                    apsa.vap_max = vap_max
-                if vap_type:
-                    apsa.vap_type = vap_type
-                if daily_bind:
-                    apsa.daily_bind = daily_bind
-                    apsa.cooling_fixed = cooling_fixed
-                if flow_meter:
-                    apsa.flow_meter = flow_meter
-                if facility_fin:
-                    apsa.facility_fin = facility_fin
+                apsa = Apsa.objects.get(id=apsa_dic['id'])
+                apsa.onsite_type = apsa_dic['onsite_type']
+                apsa.onsite_series = apsa_dic['onsite_series']
+                apsa.daily_js = apsa_dic['daily_js']
+                apsa.temperature = apsa_dic['temperature']
+                apsa.norminal_flow = apsa_dic['norminal_flow']
+                if apsa_dic['vap_max']:
+                    apsa.vap_max = apsa_dic['vap_max']
+                if apsa_dic['vap_type']:
+                    apsa.vap_type = apsa_dic['vap_type']
+                if apsa_dic['daily_bind']:
+                    apsa.daily_bind = apsa_dic['daily_bind']
+                    apsa.cooling_fixed = apsa_dic['cooling_fixed']
+                if apsa_dic['flow_meter']:
+                    apsa.flow_meter = apsa_dic['flow_meter']
+                if apsa_dic['facility_fin']:
+                    apsa.facility_fin = apsa_dic['facility_fin']
             except DatabaseError as e:
                 print(e)
                 return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
         else:
-            # 获取传入参数
-            tank_size = request.data.get('tank_size')
-            tank_func = request.data.get('tank_func')
-            level_a = request.data.get('level_a')
-            level_b = request.data.get('level_b')
-            level_c = request.data.get('level_c')
-            level_d = request.data.get('level_d')
-            filling_js = request.data.get('filling_js')
             # 验证保存数据
             try:
                 # bulk保存
                 bulk = Bulk.objects.get(asset=asset)
-                bulk.tank_size = tank_size
-                bulk.tank_func = tank_func
-                bulk.level_a = level_a
-                bulk.level_b = level_b
-                bulk.level_c = level_c
-                bulk.level_d = level_d
-                bulk.filling_js = filling_js
+                bulk.tank_size = bulk_dic['tank_size']
+                bulk.tank_func = bulk_dic['tank_func']
+                bulk.level_a = bulk_dic['level_a']
+                bulk.level_b = bulk_dic['level_b']
+                bulk.level_c = bulk_dic['level_c']
+                bulk.level_d = bulk_dic['level_d']
+                bulk.filling_js = bulk_dic['filling_js']
             except DatabaseError as e:
                 print(e)
                 return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
@@ -839,12 +819,12 @@ class AssetModelView(UpdateListRetrieveViewSet):
         if comment:
             asset.comment = comment
         asset.rtu_name = rtu_name
-        site = Site.objects.get(asset=asset)
-        site.engineer = User.objects.get(id=engineer_id)
+        site = Site.objects.get(id=site_dic['id'])
+        site.engineer = User.objects.get(id=site_dic['engineer']['id'])
         try:
-            if bulk:
+            if bulk_dic:
                 bulk.save()
-            if apsa:
+            if apsa_dic:
                 apsa.save()
             asset.save()
             site.save()

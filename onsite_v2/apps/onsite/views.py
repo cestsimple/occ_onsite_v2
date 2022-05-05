@@ -442,7 +442,7 @@ class FillingModelView(ModelViewSet):
         if group:
             self.queryset = self.queryset.filter(bulk__asset__site__engineer__group=group)
         if name:
-            name = name.upper()
+            name = name.strip().upper()
             self.queryset = self.queryset.filter(
                 Q(bulk__asset__rtu_name__contains=name) | Q(bulk__asset__site__name__contains=name)
             )
@@ -562,7 +562,7 @@ class DailyModelView(ListUpdateViewSet):
         if group:
             self.queryset = self.queryset.filter(apsa__asset__site__engineer__group=group)
         if name:
-            name = name.upper()
+            name = name.strip().upper()
             self.queryset = self.queryset.filter(
                 Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
             )
@@ -706,7 +706,7 @@ class MalfunctionModelView(ModelViewSet):
         if group:
             self.queryset = self.queryset.filter(apsa__asset__site__engineer__group=group)
         if name:
-            name = name.upper()
+            name = name.strip().upper()
             self.queryset = self.queryset.filter(
                 Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
             )
@@ -778,7 +778,7 @@ class ReasonModelView(ListViewSet):
     pagination_class = PageNum
 
     # 权限
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def list(self, request):
         query = request.query_params

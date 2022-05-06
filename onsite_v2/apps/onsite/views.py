@@ -1,6 +1,7 @@
 import threading
 from datetime import datetime, timedelta
 
+from dateutil.relativedelta import relativedelta
 from django.db import DatabaseError
 from django.db.models import Q
 from rest_framework import status
@@ -12,8 +13,9 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 
 from apps.iot.models import Bulk, Apsa, Variable, Record, Site, Asset
 from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet, ListUpdateViewSet
-from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail
-from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer
+from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail, FillingMonthly
+from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer, \
+    FillingMonthlySerializer
 from utils import jobs
 from utils.pagination import PageNum
 
@@ -418,6 +420,86 @@ class DailyCalculate(View):
             res.append(new_date)
 
 
+class FillMonthlyCalculate(View):
+    """计算月充液报表"""
+    def __init__(self):
+        self.start = ''
+        self.end = ''
+        self.bulk = None
+
+    def get(self, request):
+        # 检查Job状态
+        if jobs.check('ONSITE_FILLING_MONTHLY'):
+            return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
+
+        # 检查日期是否在21号之后，并设置日期
+        if datetime.today().day < 6:
+            jobs.update('ONSITE_FILLING_MONTHLY', 'ERROR: RequestTooEarly')
+            return JsonResponse({'status': 400, 'msg': '请在21号或以后生成数据'})
+        try:
+            month = datetime.today().month
+            year = datetime.today().year
+            self.end = datetime(year, month, 6)
+            self.start = self.end + relativedelta(months=-1)
+        except Exception:
+            jobs.update('ONSITE_FILLING_MONTHLY', 'ERROR: QueryDateSetError')
+            return JsonResponse({'status': 400, 'msg': '查询时间设置错误'})
+
+        # 创建子线程
+        threading.Thread(target=self.calculate_main).start()
+
+        # 返回相应结果
+        return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
+
+    def calculate_main(self):
+        # 获取所有储罐
+        bulks = Bulk.objects.filter(filling_js__gte=1)
+
+        # 异常处理
+        try:
+            # 对储罐循环
+            for bulk in bulks:
+                # 设置全局变量,设置过程变量
+                self.bulk = bulk
+                f_quantity = 0
+
+                # 抓取开头结尾液位
+                l_start = self.get_level(self.start)
+                l_end = self.get_level(self.end)
+
+                # 抓取时间范围内所有Filling记录(液态L)
+                f_quantity += sum([
+                    x.quantity for x in Filling.objects.filter(bulk=bulk, time_1__range=[self.start, self.end])
+                ])
+
+                # 公式计算汇总记录(液态立方米) f = 始末液位*容积(M3) + 月度充液量(M3)
+                quantity = (l_start - l_end) * bulk.tank_size / 100 + f_quantity / 1000
+
+                # 数据库保存或更新
+                FillingMonthly.objects.update_or_create(
+                    bulk=bulk, date=self.end,
+                    defaults={
+                        'start': l_start,
+                        'end': l_end,
+                        'quantity': round(quantity, 2),
+                    }
+                )
+        except Exception as e:
+            # 更新Job状态
+            jobs.update('ONSITE_FILLING_MONTHLY', f'calculate_main(): {e}')
+        else:
+            jobs.update('ONSITE_FILLING_MONTHLY', 'OK')
+
+    def get_level(self, date):
+        try:
+            r = Record.objects.get(variable__asset__bulk=self.bulk, time=date)
+            if r.value != 0 and date == self.start:
+                print(r.id)
+            return Record.objects.get(variable__asset__bulk=self.bulk, time=date).value
+        except Exception:
+            return 0
+
+
 class FillingModelView(ModelViewSet):
     # 查询集
     queryset = Filling.objects.order_by('confirm', 'bulk__asset__rtu_name', 'time_1')
@@ -536,6 +618,31 @@ class FillingModelView(ModelViewSet):
         daily.lin_tot = round(daily.lin_tot + lin_tot, 2)
         daily.filling = round(daily.filling + diff)
         daily.save()
+
+
+class FillMonthlyView(ListUpdateViewSet):
+    # 查询集
+    queryset = FillingMonthly.objects.order_by('bulk__asset__site__engineer_region')
+    # 序列化器
+    serializer_class = FillingMonthlySerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    #permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # 重写，添加条件过滤功能
+        querry = self.request.query_params
+        date = querry.get('date')
+        region = querry.get('region')
+
+        if region:
+            self.queryset = self.queryset.filter(bulk__asset__site__engineer__region=region)
+
+        if date:
+            self.queryset = self.queryset.filter(date=date+'-6')
+
+        return self.queryset
 
 
 class DailyModelView(ListUpdateViewSet):
@@ -869,3 +976,7 @@ class ReasonDetailModelView(ListViewSet):
                 return JsonResponse({'code': 400, 'errmsg': '下级原因数据错误'})
 
             return JsonResponse({'code': 200, 'errmsg': 'OK', 'sub_data': sub_data})
+
+
+class MonthlyFillingView(ModelViewSet):
+    pass

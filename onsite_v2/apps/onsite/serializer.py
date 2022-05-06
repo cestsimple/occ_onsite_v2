@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from .models import Filling, Daily, DailyMod, Malfunction
-from ..iot.models import Site, Asset, Apsa
+from .models import Filling, Daily, DailyMod, Malfunction, FillingMonthly
+from ..iot.models import Asset
 
 
 class FillingSerializer(serializers.ModelSerializer):
@@ -73,3 +73,23 @@ class DailySerializer(serializers.ModelSerializer):
     class Meta:
         model = Daily
         fields = '__all__'
+
+
+class FillingMonthlySerializer(serializers.ModelSerializer):
+    asset_name = serializers.SerializerMethodField()
+    rtu_name = serializers.SerializerMethodField()
+    tank_size = serializers.SerializerMethodField()
+
+    def get_asset_name(self, obj):
+        return Asset.objects.get(bulk=obj.bulk).name
+
+    def get_rtu_name(self, obj):
+        return Asset.objects.get(bulk=obj.bulk).rtu_name
+
+    def get_tank_size(self, obj):
+        return obj.bulk.tank_size
+
+    class Meta:
+        model = FillingMonthly
+        exclude = ['bulk']
+        read_only_fields = ['rtu_name', 'asset_name', 'id', 'date', 'tank_size']

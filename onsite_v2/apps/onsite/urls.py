@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     # 计算
     url(r'^filling/calculate/$', views.FillingCalculate.as_view()),
+    url(r'^filling/monthly/calculate/$', views.FillMonthlyCalculate.as_view()),
     url(r'^daily/calculate/$', views.DailyCalculate.as_view()),
 
     # 增删改查
@@ -11,6 +12,10 @@ urlpatterns = [
     url(r'^filling/$', views.FillingModelView.as_view({'get': 'list', 'post': 'create'})),
     url(r'^filling/(?P<pk>\d+)/$',
         views.FillingModelView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
+
+    # filling 月报
+    url(r'^filling/monthly/$', views.FillMonthlyView.as_view({'get': 'list'})),
+    url(r'^filling/monthly/(?P<pk>\d+)/$', views.FillMonthlyView.as_view({'put': 'update'})),
 
     # daily
     url(r'^daily/$', views.DailyModelView.as_view({'get': 'list'})),

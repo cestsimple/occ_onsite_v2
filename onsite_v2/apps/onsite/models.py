@@ -1,5 +1,5 @@
 from django.db import models
-from apps.iot.models import Bulk, Apsa
+from apps.iot.models import Bulk, Apsa, Variable
 from apps.user.models import User
 
 
@@ -109,3 +109,32 @@ class ReasonDetail(models.Model):
     cname = models.CharField(max_length=100, default='')
     ename = models.CharField(max_length=100, default='')
     parent = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, related_name='subs', blank=True, verbose_name='上级原因')
+
+
+class FillingMonthly(models.Model):
+    """月度充液汇总表"""
+    id = models.AutoField(primary_key=True, verbose_name='数字id')
+    date = models.DateTimeField(verbose_name="Month")
+    bulk = models.ForeignKey(Bulk, on_delete='CASCADE', max_length=100, verbose_name='储罐资产')
+    start = models.FloatField(max_length=20, verbose_name="Level Before")
+    end = models.FloatField(max_length=20, verbose_name="Level After")
+    quantity = models.FloatField(max_length=20, verbose_name="Filling Quantity")
+    confirm = models.IntegerField(verbose_name='确认标志', default=0)
+
+
+class InvoiceDiff(models.Model):
+    """开票变量差值表"""
+    id = models.AutoField(primary_key=True, verbose_name='数字id')
+    date = models.DateTimeField(verbose_name="Month")
+    apsa = models.ForeignKey(Apsa, on_delete='CASCADE', max_length=100, verbose_name='Apsa资产')
+    start = models.FloatField(max_length=20, verbose_name="Value Before")
+    end = models.FloatField(max_length=20, verbose_name="Value After")
+    confirm = models.IntegerField(verbose_name='确认标志', default=0)
+
+
+class MonthlyVariable(models.Model):
+    """月报变量登记表"""
+    id = models.AutoField(primary_key=True, verbose_name='数字id')
+    apsa = models.ForeignKey(Apsa, on_delete='CASCADE', max_length=100, verbose_name='Apsa资产')
+    variable = models.ForeignKey(Variable, on_delete='CASCADE', max_length=100, verbose_name='变量')
+    usage = models.CharField(max_length=20, verbose_name="用处")

@@ -31,6 +31,9 @@ class DailyModSerializer(serializers.ModelSerializer):
     class Meta:
         model = DailyMod
         exclude = ['date', 'apsa']
+        extra_kwargs = {
+            'comment': {'allow_blank': True},
+        }
 
 
 class MalfunctionSerializer(serializers.ModelSerializer):

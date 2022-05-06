@@ -67,11 +67,11 @@ class Apsa(models.Model):
     facility_fin = models.CharField(max_length=50, verbose_name='项目号', default='')
     daily_js = models.IntegerField(default=0, verbose_name='计算daily')
     temperature = models.FloatField(max_length=30, verbose_name='daily温度', default=0)
-    vap_max = models.CharField(max_length=30, verbose_name='汽化器最大能力', default='')
+    vap_max = models.IntegerField(verbose_name='汽化器最大能力', default=0)
     vap_type = models.CharField(max_length=30, verbose_name='汽化器类型', default='')
     norminal_flow = models.IntegerField(verbose_name='合同产量', default=0)
-    daily_bind = models.CharField(max_length=100, verbose_name='daily绑定资产id', default='')
-    flow_meter = models.CharField(max_length=100, verbose_name='流量计变量id', default='')
+    daily_bind = models.IntegerField(verbose_name='daily绑定资产id', default=-1)
+    flow_meter = models.IntegerField(verbose_name='流量计变量id', default=-1)
     cooling_fixed = models.FloatField(max_length=10, verbose_name='cooling设定值', default=0)
 
     class Meta:

@@ -1,4 +1,3 @@
-import http
 import threading
 import time
 import requests
@@ -917,3 +916,21 @@ class AddOriginDataView(View):
                     print(asset.id)
                     print('-' * 100)
         return JsonResponse({'status': 200})
+
+
+class AsyncJobView(View):
+    """返回未完成任务"""
+    def get(self, request):
+        undone_tasks = AsyncJob.objects.filter(result='')
+        res_list = []
+        for task in undone_tasks:
+            res_list.append({
+                'id': task.id,
+                'name': task.name,
+                'start_time': task.start_time
+            })
+        return JsonResponse({
+            'status': 200,
+            'msg': 'ok',
+            'res': res_list
+        })

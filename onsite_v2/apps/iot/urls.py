@@ -30,5 +30,8 @@ urlpatterns = [
     url(r'^asset/(?P<pk>\d+)/$', views.AssetModelView.as_view({'get': 'retrieve', 'put': 'update'})),
 
     # 添加原始数据
-    url(r'^iot/origin/$', views.AddOriginDataView.as_view())
+    url(r'^iot/origin/$', views.AddOriginDataView.as_view()),
+
+    # job
+    url(r'^asyncjob/$', views.AsyncJobView.as_view())
 ]

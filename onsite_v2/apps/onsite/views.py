@@ -540,7 +540,7 @@ class FillingModelView(ModelViewSet):
 
 class DailyModelView(ListUpdateViewSet):
     # 查询集
-    queryset = Daily.objects.order_by('confirm', 'apsa__onsite_series', 'apsa__asset__rtu_name')
+    queryset = Daily.objects.order_by('confirm', 'apsa__asset__site__engineer__region', 'apsa__onsite_series', 'apsa__asset__rtu_name')
     # 序列化器
     serializer_class = DailySerializer
     # 指定分页器
@@ -630,10 +630,10 @@ class DailyModelView(ListUpdateViewSet):
                 'h_prod': round(h_prod, 2),
                 'h_stop': round(h_stop, 2),
                 'h_missing': round(h_missing, 2),
-                'm3_prod': round(m3_prod, 2),
+                'm3_prod': int(m3_prod),
                 'avg_prod': round(avg_prod, 2),
                 'cus_consume': round(cus_consume, 2),
-                'avg_consume': round(avg_consume, 2),
+                'avg_consume': int(avg_consume),
                 'peak': round(peak, 2),
                 'v_peak': round(v_peak, 2),
                 'lin_tot': round(lin_tot, 2),
@@ -642,10 +642,10 @@ class DailyModelView(ListUpdateViewSet):
                 'mod_id': round(mod_id, 2),
                 'cooling': round(cooling, 2),
                 'filling': round(d['filling'], 2),
-                'vap_max': apsa.vap_max,
+                'vap_max': int(apsa.vap_max),
                 'success': d['success'],
                 'confirm': d['confirm'],
-                'comment': mod.comment
+                'comment': mod.comment,
             })
 
         return res_list
@@ -684,7 +684,7 @@ class DailyModModelView(RetrieveUpdateViewSet):
 
 class MalfunctionModelView(ModelViewSet):
     # 查询集
-    queryset = Malfunction.objects.all()
+    queryset = Malfunction.objects.all().order_by('apsa__asset__site__engineer__region', 'apsa__onsite_series')
     # 序列化器
     serializer_class = MalfunctionSerializer
     # 指定分页器

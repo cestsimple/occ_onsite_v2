@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Filling, Daily, DailyMod, Malfunction, FillingMonthly
+from .models import Filling, Daily, DailyMod, Malfunction, FillingMonthly, MonthlyVariable
 from ..iot.models import Asset
 
 
@@ -93,3 +93,15 @@ class FillingMonthlySerializer(serializers.ModelSerializer):
         model = FillingMonthly
         exclude = ['bulk']
         read_only_fields = ['rtu_name', 'asset_name', 'id', 'date', 'tank_size']
+
+
+class MonthlyVariableSerializer(serializers.ModelSerializer):
+    rtu_name = serializers.SerializerMethodField()
+
+    def get_rtu_name(self, obj):
+        return Asset.objects.get(apsa=obj.apsa).rtu_name
+
+    class Meta:
+        model = MonthlyVariable
+        fields = '__all__'
+        read_only_fields = ['rtu_name', 'id']

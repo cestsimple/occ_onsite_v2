@@ -13,9 +13,9 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 
 from apps.iot.models import Bulk, Apsa, Variable, Record, Site, Asset
 from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet, ListUpdateViewSet
-from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail, FillingMonthly
+from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail, FillingMonthly, MonthlyVariable
 from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer, \
-    FillingMonthlySerializer
+    FillingMonthlySerializer, MonthlyVariableSerializer
 from utils import jobs
 from utils.pagination import PageNum
 
@@ -628,7 +628,7 @@ class FillMonthlyView(ListUpdateViewSet):
     # 指定分页器
     pagination_class = PageNum
     # 权限
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         # 重写，添加条件过滤功能
@@ -883,7 +883,6 @@ class ReasonModelView(ListViewSet):
     serializer_class = MalfunctionSerializer
     # 指定分页器
     pagination_class = PageNum
-
     # 权限
     permission_classes = [IsAuthenticated]
 
@@ -934,9 +933,8 @@ class ReasonDetailModelView(ListViewSet):
     serializer_class = MalfunctionSerializer
     # 指定分页器
     pagination_class = PageNum
-
     # 权限
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def list(self, request):
         query = request.query_params
@@ -978,5 +976,31 @@ class ReasonDetailModelView(ListViewSet):
             return JsonResponse({'code': 200, 'errmsg': 'OK', 'sub_data': sub_data})
 
 
-class MonthlyFillingView(ModelViewSet):
-    pass
+class MonthlyVariableModelView(ModelViewSet):
+    # 查询集
+    queryset = MonthlyVariable.objects.order_by('apsa__asset__site__engineer_region')
+    # 序列化器
+    serializer_class = MonthlyVariableSerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # 条件过滤功能
+        querry = self.request.query_params
+        name = querry.get('name')
+        region = querry.get('region')
+        group = querry.get('group')
+
+        if region:
+            self.queryset = self.queryset.filter(apsa__asset__site__engineer__region=region)
+        if group:
+            self.queryset = self.queryset.filter(apsa__asset__site__engineer__group=group)
+        if name:
+            name = name.strip().upper()
+            self.queryset = self.queryset.filter(
+                Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
+            )
+
+        return self.queryset

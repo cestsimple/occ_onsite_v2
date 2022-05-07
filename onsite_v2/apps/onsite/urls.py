@@ -7,15 +7,14 @@ urlpatterns = [
     url(r'^filling/monthly/calculate/$', views.FillMonthlyCalculate.as_view()),
     url(r'^daily/calculate/$', views.DailyCalculate.as_view()),
 
-    # 增删改查
     # filling
     url(r'^filling/$', views.FillingModelView.as_view({'get': 'list', 'post': 'create'})),
     url(r'^filling/(?P<pk>\d+)/$',
         views.FillingModelView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 
     # filling 月报
-    url(r'^filling/monthly/$', views.FillMonthlyView.as_view({'get': 'list'})),
-    url(r'^filling/monthly/(?P<pk>\d+)/$', views.FillMonthlyView.as_view({'put': 'update'})),
+    url(r'^monthly/filling/$', views.FillMonthlyView.as_view({'get': 'list'})),
+    url(r'^monthly/filling/(?P<pk>\d+)/$', views.FillMonthlyView.as_view({'put': 'update'})),
 
     # daily
     url(r'^daily/$', views.DailyModelView.as_view({'get': 'list'})),
@@ -34,4 +33,9 @@ urlpatterns = [
     url(r'^malfunction/reason/$', views.ReasonModelView.as_view({'get': 'list'})),
     # reason-detail
     url(r'^malfunction/reason/detail/$', views.ReasonDetailModelView.as_view({'get': 'list'})),
+
+    # monthly variable
+    url(r'^monthly/variable/$', views.MonthlyVariableModelView.as_view({'get': 'list', 'post': 'create'})),
+    url(r'^monthly/variable/(?P<pk>\d+)/$',
+            views.MonthlyVariableModelView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 ]

@@ -1,16 +1,14 @@
 from django.db import DatabaseError
 from django.db.models import Q
 from django.http import JsonResponse
-from django.shortcuts import render
 from django.views import View
 from rest_framework import status
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
-
 from utils.pagination import PageNum
-from .models import User
-from .serializer import UserSerializer
+from .models import User, Role, Permission, RolePermission
+from .serializer import UserSerializer, RoleSerializer, PermissionSerializer, RolePermissionSerializer
 
 
 class AdminCreateView(View):
@@ -80,3 +78,65 @@ class UserView(ModelViewSet):
             return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'status': 200, 'msg': '保存成功'})
+
+
+class RoleModelView(ModelViewSet):
+    # 查询集
+    queryset = Role.objects.all()
+    # 序列化器
+    serializer_class = RoleSerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    permission_classes = [IsAuthenticated]
+
+
+class PermissionModelView(ModelViewSet):
+    # 查询集
+    queryset = Permission.objects.all()
+    # 序列化器
+    serializer_class = PermissionSerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    permission_classes = [IsAuthenticated]
+
+
+class RolePermissionModelView(ModelViewSet):
+    # 查询集
+    queryset = RolePermission.objects.all()
+    # 序列化器
+    serializer_class = RolePermissionSerializer
+    # 指定分页器
+    pagination_class = PageNum
+
+    # 权限
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        query_params = self.request.query_params
+        role = query_params.get('role')
+
+        if role:
+            return self.queryset.filter(role=role)
+
+        return self.queryset
+
+    def create(self, request, *args, **kwargs):
+        """重写新建功能"""
+        role_id = request.data.get('role_id')
+        permission_ids = request.data.get('permission_id')
+
+        # 验证参数
+        if not (all([role_id, permission_ids])):
+            return Response(f'参数不齐全', status=status.HTTP_400_BAD_REQUEST)
+
+        for permission_id in permission_ids:
+            # 检查是否存在
+            if not RolePermission.objects.filter(role_id=role_id, permission_id=permission_id).count():
+                RolePermission.objects.create(
+                    role=Role.objects.get(id=role_id),
+                    permission=Permission.objects.get(id=permission_id)
+                )
+
+        return Response({'status': 200, 'msg': '创建成功'})

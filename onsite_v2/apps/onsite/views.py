@@ -1,7 +1,7 @@
 import threading
 from datetime import datetime, timedelta
-
 from dateutil.relativedelta import relativedelta
+
 from django.db import DatabaseError
 from django.db.models import Q
 from rest_framework import status
@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from django.http import JsonResponse
 from django.views import View
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 
 from apps.iot.models import Bulk, Apsa, Variable, Record, Site, Asset
 from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet, ListUpdateViewSet

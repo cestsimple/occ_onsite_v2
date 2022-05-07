@@ -1,5 +1,5 @@
 from rest_framework.serializers import ModelSerializer
-from .models import User
+from .models import User, Role, Permission, RolePermission
 
 
 class UserSerializer(ModelSerializer):
@@ -29,3 +29,23 @@ class UserSerializer(ModelSerializer):
         # 保存用户数据并对密码加密
         user = User.objects.create_user(**validated_data)
         return user
+
+
+class RoleSerializer(ModelSerializer):
+    class Meta:
+        model = Role
+        fields = '__all__'
+
+
+class PermissionSerializer(ModelSerializer):
+    class Meta:
+        model = Permission
+        fields = '__all__'
+
+
+class RolePermissionSerializer(ModelSerializer):
+    permission = PermissionSerializer()
+
+    class Meta:
+        model = RolePermission
+        fields = '__all__'

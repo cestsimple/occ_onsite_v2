@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Filling, Daily, DailyMod, Malfunction, FillingMonthly, MonthlyVariable
+from .models import Filling, Daily, DailyMod, Malfunction, FillingMonthly, MonthlyVariable, InvoiceDiff
 from ..iot.models import Asset
 
 
@@ -105,3 +105,25 @@ class MonthlyVariableSerializer(serializers.ModelSerializer):
         model = MonthlyVariable
         fields = '__all__'
         read_only_fields = ['rtu_name', 'id']
+
+
+class InvoiceDiffSerializer(serializers.ModelSerializer):
+    rtu_name = serializers.SerializerMethodField()
+    diff = serializers.SerializerMethodField()
+    variable_name = serializers.SerializerMethodField()
+
+    def get_rtu_name(self, obj):
+        return Asset.objects.get(apsa=obj.apsa).rtu_name
+
+    def get_variable_name(self, obj):
+        return obj.variable.name
+
+    def get_diff(self, obj):
+        if obj.variable.name == 'H_PROD':
+            return obj.end
+        return round(obj.end - obj.start, 2)
+
+    class Meta:
+        model = InvoiceDiff
+        exclude = ['apsa', 'variable']
+        read_only_fields = ['rtu_name', 'id', 'date', 'usage', 'variable_name', 'get_diff']

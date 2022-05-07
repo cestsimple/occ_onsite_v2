@@ -127,6 +127,8 @@ class InvoiceDiff(models.Model):
     id = models.AutoField(primary_key=True, verbose_name='数字id')
     date = models.DateTimeField(verbose_name="Month")
     apsa = models.ForeignKey(Apsa, on_delete='CASCADE', max_length=100, verbose_name='Apsa资产')
+    variable = models.ForeignKey(Variable, on_delete='CASCADE', max_length=100, verbose_name='变量')
+    usage = models.CharField(max_length=100, default='')
     start = models.FloatField(max_length=20, verbose_name="Value Before")
     end = models.FloatField(max_length=20, verbose_name="Value After")
     confirm = models.IntegerField(verbose_name='确认标志', default=0)

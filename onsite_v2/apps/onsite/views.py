@@ -13,9 +13,10 @@ from rest_framework.permissions import IsAuthenticated
 
 from apps.iot.models import Bulk, Apsa, Variable, Record, Site, Asset
 from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet, ListUpdateViewSet
-from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail, FillingMonthly, MonthlyVariable
+from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail, FillingMonthly, MonthlyVariable, \
+    InvoiceDiff
 from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer, \
-    FillingMonthlySerializer, MonthlyVariableSerializer
+    FillingMonthlySerializer, MonthlyVariableSerializer, InvoiceDiffSerializer
 from utils import jobs
 from utils.pagination import PageNum
 
@@ -422,6 +423,7 @@ class DailyCalculate(View):
 
 class FillMonthlyCalculate(View):
     """计算月充液报表"""
+
     def __init__(self):
         self.start = ''
         self.end = ''
@@ -492,10 +494,84 @@ class FillMonthlyCalculate(View):
 
     def get_level(self, date):
         try:
-            r = Record.objects.get(variable__asset__bulk=self.bulk, time=date)
-            if r.value != 0 and date == self.start:
-                print(r.id)
             return Record.objects.get(variable__asset__bulk=self.bulk, time=date).value
+        except Exception:
+            return 0
+
+
+class InvoiceDiffCalculate(View):
+    """计算月报表变量差值"""
+
+    def __init__(self):
+        self.start = ''
+        self.end = ''
+        self.region = ''
+        self.variable = None
+
+    def get(self, request):
+        # 获取计算日期
+        query_params = request.GET
+        self.start = query_params.get('start')
+        self.region = query_params.get('region')
+
+        # 检查Job状态
+        if jobs.check('ONSITE_INVOICE_DIFF'):
+            return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
+
+        # 检查日期是否在21号之后，并设置日期
+        if datetime.today().day < 7:
+            jobs.update('ONSITE_INVOICE_DIFF', 'ERROR: RequestTooEarly')
+            return JsonResponse({'status': 400, 'msg': '请在21号或以后生成数据'})
+        try:
+            month = datetime.today().month
+            year = datetime.today().year
+            self.end = datetime(year, month, 7)
+            self.start = self.end + relativedelta(months=-1)
+        except Exception:
+            jobs.update('ONSITE_INVOICE_DIFF', 'ERROR: QueryDateSetError')
+            return JsonResponse({'status': 400, 'msg': '查询时间设置错误'})
+
+        # 创建子线程
+        threading.Thread(target=self.calculate_main).start()
+
+        # 返回相应结果
+        return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
+
+    def calculate_main(self):
+        # 获取所有需要计算的variables
+        monthly_variables_matches = MonthlyVariable.objects.filter(usage='INVOICE')
+
+        # 异常处理
+        try:
+            # 对记录循环
+            for match in monthly_variables_matches:
+                # 设置全局变量
+                self.variable = match.variable
+
+                # 抓取开头结尾液位
+                v_start = self.get_value(self.start)
+                v_end = self.get_value(self.end)
+
+                # 数据库保存或更新
+                InvoiceDiff.objects.update_or_create(
+                    apsa=match.apsa,
+                    date=self.end,
+                    variable=match.variable,
+                    defaults={
+                        'usage': 'INVOICE',
+                        'start': v_start,
+                        'end': v_end,
+                    }
+                )
+        except Exception as e:
+            # 更新Job状态
+            jobs.update('ONSITE_INVOICE_DIFF', f'calculate_main(): {e}')
+        else:
+            jobs.update('ONSITE_INVOICE_DIFF', 'OK')
+
+    def get_value(self, date):
+        try:
+            return Record.objects.get(variable=self.variable, time=date).value
         except Exception:
             return 0
 
@@ -640,14 +716,15 @@ class FillMonthlyView(ListUpdateViewSet):
             self.queryset = self.queryset.filter(bulk__asset__site__engineer__region=region)
 
         if date:
-            self.queryset = self.queryset.filter(date=date+'-6')
+            self.queryset = self.queryset.filter(date=date + '-6')
 
         return self.queryset
 
 
 class DailyModelView(ListUpdateViewSet):
     # 查询集
-    queryset = Daily.objects.order_by('confirm', 'apsa__asset__site__engineer__region', 'apsa__onsite_series', 'apsa__asset__rtu_name')
+    queryset = Daily.objects.order_by('confirm', 'apsa__asset__site__engineer__region', 'apsa__onsite_series',
+                                      'apsa__asset__rtu_name')
     # 序列化器
     serializer_class = DailySerializer
     # 指定分页器
@@ -709,7 +786,8 @@ class DailyModelView(ListUpdateViewSet):
             mod = DailyMod.objects.get(date=d['date'], apsa__id=d['apsa'])
             # 创建内容
             h_prod = d['h_prod'] + mod.h_prod_mod
-            h_stop = d['h_stpal']+d['h_stp400v']+d['h_stpdft']+ mod.h_stpal_mod + mod.h_stpdft_mod + mod.h_stp400v_mod
+            h_stop = d['h_stpal'] + d['h_stp400v'] + d[
+                'h_stpdft'] + mod.h_stpal_mod + mod.h_stpdft_mod + mod.h_stp400v_mod
             h_missing = 24 - h_stop - h_prod
             m3_prod = d['m3_prod'] + mod.m3_prod_mod
             avg_prod = m3_prod / h_prod if h_prod else 0
@@ -990,6 +1068,7 @@ class MonthlyVariableModelView(ModelViewSet):
         # 条件过滤功能
         querry = self.request.query_params
         name = querry.get('name')
+        usage = querry.get('usage')
         region = querry.get('region')
         group = querry.get('group')
 
@@ -1002,5 +1081,40 @@ class MonthlyVariableModelView(ModelViewSet):
             self.queryset = self.queryset.filter(
                 Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
             )
+        if usage:
+            self.queryset = self.queryset.filter(usage=usage.upper())
+
+        return self.queryset
+
+
+class InvoiceDiffModelView(ModelViewSet):
+    # 查询集
+    queryset = InvoiceDiff.objects.order_by('apsa__asset__site__engineer_region')
+    # 序列化器
+    serializer_class = InvoiceDiffSerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # 条件过滤功能
+        querry = self.request.query_params
+        name = querry.get('name')
+        usage = querry.get('usage')
+        region = querry.get('region')
+        group = querry.get('group')
+
+        if region:
+            self.queryset = self.queryset.filter(apsa__asset__site__engineer__region=region)
+        if group:
+            self.queryset = self.queryset.filter(apsa__asset__site__engineer__group=group)
+        if name:
+            name = name.strip().upper()
+            self.queryset = self.queryset.filter(
+                Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
+            )
+        if usage:
+            self.queryset = self.queryset.filter(usage=usage.upper())
 
         return self.queryset

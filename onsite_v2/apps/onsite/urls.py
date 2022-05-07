@@ -6,6 +6,7 @@ urlpatterns = [
     url(r'^filling/calculate/$', views.FillingCalculate.as_view()),
     url(r'^filling/monthly/calculate/$', views.FillMonthlyCalculate.as_view()),
     url(r'^daily/calculate/$', views.DailyCalculate.as_view()),
+    url(r'^monthly/invoice/calculate/$', views.InvoiceDiffCalculate.as_view()),
 
     # filling
     url(r'^filling/$', views.FillingModelView.as_view({'get': 'list', 'post': 'create'})),
@@ -38,4 +39,9 @@ urlpatterns = [
     url(r'^monthly/variable/$', views.MonthlyVariableModelView.as_view({'get': 'list', 'post': 'create'})),
     url(r'^monthly/variable/(?P<pk>\d+)/$',
             views.MonthlyVariableModelView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
+
+    # invoice variable diff
+    url(r'^monthly/variable/diff/$', views.InvoiceDiffModelView.as_view({'get': 'list'})),
+    url(r'^monthly/variable/diff/(?P<pk>\d+)/$',
+            views.InvoiceDiffModelView.as_view({'get': 'retrieve', 'put': 'update'})),
 ]

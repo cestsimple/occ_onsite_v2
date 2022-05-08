@@ -430,6 +430,10 @@ class FillMonthlyCalculate(View):
         self.bulk = None
 
     def get(self, request):
+        query_params = request.GET
+        start = query_params.get('start')
+        self.region = query_params.get('region')
+
         # 检查Job状态
         if jobs.check('ONSITE_FILLING_MONTHLY'):
             return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
@@ -439,9 +443,10 @@ class FillMonthlyCalculate(View):
             jobs.update('ONSITE_FILLING_MONTHLY', 'ERROR: RequestTooEarly')
             return JsonResponse({'status': 400, 'msg': '请在21号或以后生成数据'})
         try:
+            day = int(start.split('-')[-1])
             month = datetime.today().month
             year = datetime.today().year
-            self.end = datetime(year, month, 6)
+            self.end = datetime(year, month, day)
             self.start = self.end + relativedelta(months=-1)
         except Exception:
             jobs.update('ONSITE_FILLING_MONTHLY', 'ERROR: QueryDateSetError')
@@ -456,6 +461,9 @@ class FillMonthlyCalculate(View):
     def calculate_main(self):
         # 获取所有储罐
         bulks = Bulk.objects.filter(filling_js__gte=1)
+
+        if self.region:
+            bulks = bulks.filter(asset__site__engineer__region=self.region)
 
         # 异常处理
         try:
@@ -511,7 +519,7 @@ class InvoiceDiffCalculate(View):
     def get(self, request):
         # 获取计算日期
         query_params = request.GET
-        self.start = query_params.get('start')
+        start = query_params.get('start')
         self.region = query_params.get('region')
 
         # 检查Job状态
@@ -523,9 +531,10 @@ class InvoiceDiffCalculate(View):
             jobs.update('ONSITE_INVOICE_DIFF', 'ERROR: RequestTooEarly')
             return JsonResponse({'status': 400, 'msg': '请在21号或以后生成数据'})
         try:
+            day = int(start.split('-')[-1])
             month = datetime.today().month
             year = datetime.today().year
-            self.end = datetime(year, month, 7)
+            self.end = datetime(year, month, day)
             self.start = self.end + relativedelta(months=-1)
         except Exception:
             jobs.update('ONSITE_INVOICE_DIFF', 'ERROR: QueryDateSetError')
@@ -539,12 +548,14 @@ class InvoiceDiffCalculate(View):
 
     def calculate_main(self):
         # 获取所有需要计算的variables
-        monthly_variables_matches = MonthlyVariable.objects.filter(usage='INVOICE')
+        monthly_variable_matches = MonthlyVariable.objects.filter(usage='INVOICE')
+        if self.region:
+            monthly_variable_matches = monthly_variable_matches.filter(apsa__asset__site__engineer__region=self.region)
 
         # 异常处理
         try:
             # 对记录循环
-            for match in monthly_variables_matches:
+            for match in monthly_variable_matches:
                 # 设置全局变量
                 self.variable = match.variable
 
@@ -716,7 +727,7 @@ class FillMonthlyView(ListUpdateViewSet):
             self.queryset = self.queryset.filter(bulk__asset__site__engineer__region=region)
 
         if date:
-            self.queryset = self.queryset.filter(date=date + '-6')
+            self.queryset = self.queryset.filter(date=date + '-7')
 
         return self.queryset
 
@@ -815,10 +826,10 @@ class DailyModelView(ListUpdateViewSet):
                 'h_prod': round(h_prod, 2),
                 'h_stop': round(h_stop, 2),
                 'h_missing': round(h_missing, 2),
-                'm3_prod': int(m3_prod),
+                'm3_prod': round(m3_prod, 2),
                 'avg_prod': round(avg_prod, 2),
                 'cus_consume': round(cus_consume, 2),
-                'avg_consume': int(avg_consume),
+                'avg_consume': round(avg_consume, 2),
                 'peak': round(peak, 2),
                 'v_peak': round(v_peak, 2),
                 'lin_tot': round(lin_tot, 2),
@@ -827,7 +838,7 @@ class DailyModelView(ListUpdateViewSet):
                 'mod_id': round(mod_id, 2),
                 'cooling': round(cooling, 2),
                 'filling': round(d['filling'], 2),
-                'vap_max': int(apsa.vap_max),
+                'vap_max': round(apsa.vap_max, 2),
                 'success': d['success'],
                 'confirm': d['confirm'],
                 'comment': mod.comment,

@@ -740,18 +740,45 @@ class AssetModelView(UpdateListRetrieveViewSet):
     def get_queryset(self):
         # 对关键词进行过滤
         apsa = self.request.query_params.get('apsa')
+        name = self.request.query_params.get('name')
+        confirm = self.request.query_params.get('confirm')
+        cal = self.request.query_params.get('cal')
+        region = self.request.query_params.get('region')
+
+        if confirm != '':
+            self.queryset = self.queryset.filter(confirm=confirm)
 
         if self.action == 'list':
             if apsa == '1':
                 self.apsa = 1
                 apsa_id_list = [x.asset_id for x in Apsa.objects.all()]
-                return self.queryset.filter(id__in=apsa_id_list)
+                if cal:
+                    apsa_id_list = [x.asset_id for x in Apsa.objects.filter(daily_js__gte=1)]
+                self.queryset = self.queryset.filter(id__in=apsa_id_list)
+                if region:
+                    self.queryset = self.queryset.filter(apsa__asset__site__engineer__region=region)
+
+                if name:
+                    name = name.strip().upper()
+                    self.queryset = self.queryset.filter(
+                        Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
+                    )
             else:
                 self.apsa = 0
                 bulk_id_list = [x.asset_id for x in Bulk.objects.all()]
-                return self.queryset.filter(id__in=bulk_id_list)
-        else:
-            return self.queryset
+                if cal:
+                    bulk_id_list = [x.asset_id for x in Bulk.objects.filter(filling_js__gte=1)]
+                self.queryset = self.queryset.filter(id__in=bulk_id_list)
+                if region:
+                    self.queryset = self.queryset.filter(bulk__asset__site__engineer__region=region)
+
+                if name:
+                    name = name.strip().upper()
+                    self.queryset = self.queryset.filter(
+                        Q(bulk__asset__rtu_name__contains=name) | Q(bulk__asset__site__name__contains=name)
+                    )
+
+        return self.queryset
 
     # 根据is_apsa使用不同序列化器
     def get_serializer_class(self):

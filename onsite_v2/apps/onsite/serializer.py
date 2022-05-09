@@ -76,9 +76,13 @@ class DailySerializer(serializers.ModelSerializer):
 
 
 class FillingMonthlySerializer(serializers.ModelSerializer):
+    date = serializers.SerializerMethodField()
     asset_name = serializers.SerializerMethodField()
     rtu_name = serializers.SerializerMethodField()
     tank_size = serializers.SerializerMethodField()
+
+    def get_date(self, obj):
+        return str(obj.date)[:10]
 
     def get_asset_name(self, obj):
         return Asset.objects.get(bulk=obj.bulk).name
@@ -108,9 +112,13 @@ class MonthlyVariableSerializer(serializers.ModelSerializer):
 
 
 class InvoiceDiffSerializer(serializers.ModelSerializer):
+    date = serializers.SerializerMethodField()
     rtu_name = serializers.SerializerMethodField()
     diff = serializers.SerializerMethodField()
     variable_name = serializers.SerializerMethodField()
+
+    def get_date(self, obj):
+        return str(obj.date)[:10]
 
     def get_rtu_name(self, obj):
         return Asset.objects.get(apsa=obj.apsa).rtu_name

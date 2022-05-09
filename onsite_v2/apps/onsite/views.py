@@ -6,6 +6,7 @@ from django.db import DatabaseError
 from django.db.models import Q
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from django.http import JsonResponse
 from django.views import View
@@ -421,7 +422,7 @@ class DailyCalculate(View):
             res.append(new_date)
 
 
-class FillMonthlyCalculate(View):
+class FillMonthlyCalculate(APIView):
     """计算月充液报表"""
 
     def __init__(self):
@@ -436,12 +437,14 @@ class FillMonthlyCalculate(View):
 
         # 检查Job状态
         if jobs.check('ONSITE_FILLING_MONTHLY'):
-            return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
+            return Response('任务正在进行中，请稍后刷新', status=status.HTTP_400_BAD_REQUEST)
 
         # 检查日期是否在21号之后，并设置日期
-        if datetime.today().day < 6:
+        if datetime.today().day < 21:
             jobs.update('ONSITE_FILLING_MONTHLY', 'ERROR: RequestTooEarly')
-            return JsonResponse({'status': 400, 'msg': '请在21号或以后生成数据'})
+            return Response('请在21号或以后生成数据', status=status.HTTP_400_BAD_REQUEST)
+
+        # 设置时间
         try:
             day = int(start.split('-')[-1])
             month = datetime.today().month
@@ -507,7 +510,7 @@ class FillMonthlyCalculate(View):
             return 0
 
 
-class InvoiceDiffCalculate(View):
+class InvoiceDiffCalculate(APIView):
     """计算月报表变量差值"""
 
     def __init__(self):
@@ -524,12 +527,14 @@ class InvoiceDiffCalculate(View):
 
         # 检查Job状态
         if jobs.check('ONSITE_INVOICE_DIFF'):
-            return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
+            return Response('任务正在进行中，请稍后刷新', status=status.HTTP_400_BAD_REQUEST)
 
         # 检查日期是否在21号之后，并设置日期
-        if datetime.today().day < 7:
-            jobs.update('ONSITE_INVOICE_DIFF', 'ERROR: RequestTooEarly')
-            return JsonResponse({'status': 400, 'msg': '请在21号或以后生成数据'})
+        if datetime.today().day < 21:
+            jobs.update('ONSITE_FILLING_MONTHLY', 'ERROR: RequestTooEarly')
+            return Response('请在21号或以后生成数据', status=status.HTTP_400_BAD_REQUEST)
+
+        # 设置时间
         try:
             day = int(start.split('-')[-1])
             month = datetime.today().month
@@ -1100,7 +1105,7 @@ class MonthlyVariableModelView(ModelViewSet):
 
 class InvoiceDiffModelView(ModelViewSet):
     # 查询集
-    queryset = InvoiceDiff.objects.order_by('apsa__asset__site__engineer_region')
+    queryset = InvoiceDiff.objects.order_by('apsa__asset__rtu_name', 'variable__name')
     # 序列化器
     serializer_class = InvoiceDiffSerializer
     # 指定分页器
@@ -1111,20 +1116,16 @@ class InvoiceDiffModelView(ModelViewSet):
     def get_queryset(self):
         # 条件过滤功能
         querry = self.request.query_params
-        name = querry.get('name')
         usage = querry.get('usage')
         region = querry.get('region')
-        group = querry.get('group')
+        date = querry.get('date')
 
         if region:
             self.queryset = self.queryset.filter(apsa__asset__site__engineer__region=region)
-        if group:
-            self.queryset = self.queryset.filter(apsa__asset__site__engineer__group=group)
-        if name:
-            name = name.strip().upper()
-            self.queryset = self.queryset.filter(
-                Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
-            )
+
+        if date:
+            self.queryset = self.queryset.filter(date=date)
+
         if usage:
             self.queryset = self.queryset.filter(usage=usage.upper())
 

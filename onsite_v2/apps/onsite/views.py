@@ -806,7 +806,7 @@ class DailyModelView(ListUpdateViewSet):
             avg_consume = cus_consume / 24
             peak = d['m3_peak'] + mod.m3_peak_mod
             v_peak = d['m3_q5'] + mod.m3_q5_mod
-            lin_tot = d['lin_tot'] + mod.lin_tot_mod + d['flow_meter'] + mod.flow_meter_mod
+            lin_tot = d['lin_tot'] + mod.lin_tot_mod - d['flow_meter'] - mod.flow_meter_mod
             dif_peak = v_peak - peak
             lin_consume = d['m3_q6'] + mod.m3_q6_mod + d['m3_q7'] + mod.m3_q7_mod
             mod_id = mod.id

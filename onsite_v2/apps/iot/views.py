@@ -633,7 +633,6 @@ class ApsaModelView(UpdateListRetrieveViewSet):
         vap_type = request.data.get('vap_type')
         norminal_flow = request.data.get('norminal_flow')
         daily_bind = request.data.get('daily_bind')
-        flow_meter = request.data.get('flow_meter')
         cooling_fixed = request.data.get('cooling_fixed')
         comment = request.data.get('comment')
 
@@ -650,7 +649,6 @@ class ApsaModelView(UpdateListRetrieveViewSet):
             apsa.vap_type = vap_type
             apsa.norminal_flow = norminal_flow
             apsa.daily_bind = daily_bind
-            apsa.flow_meter = flow_meter
             apsa.cooling_fixed = cooling_fixed
             apsa.comment = comment
             apsa.save()
@@ -723,6 +721,18 @@ class VariableModelView(UpdateListRetrieveViewSet):
             self.queryset = self.queryset.filter(asset__id=asset)
 
         return self.queryset
+
+    def update(self, request, pk):
+        daily_mark = request.data.get('daily_mark')
+        variable = Variable.objects.get(id=pk)
+
+        try:
+            variable.daily_mark = daily_mark
+            variable.save()
+        except Exception:
+            return Response('内部错误', status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'status': 200, 'msg': '保存成功'})
 
 
 class AssetModelView(UpdateListRetrieveViewSet):

@@ -218,12 +218,12 @@ class AssetData(View):
         # 更新
         list_update = []
         for update_asset in asset_update_uuid:
+            asset = Asset.objects.get(uuid=update_asset)
             site = Site.objects.filter(uuid=assets_iot_dic[update_asset]['site']['id'])
             if site:
                 site = site[0]
-            asset = Asset.objects.get(uuid=update_asset)
+                asset.site = site
             asset.name = assets_iot_dic[update_asset]['name']
-            asset.site = site
             asset.status = assets_iot_dic[update_asset]['status']['name']
             asset.variables_num = assets_iot_dic[update_asset]['totalVariables']
             list_update.append(asset)
@@ -269,11 +269,11 @@ class TagData(View):
         return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
 
     def refresh_main(self):
-        # h = get_cognito()
-        # multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.assets, h))
+        h = get_cognito()
+        multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.assets, h))
 
         # 获取tags后对资产进行分类apsa/bulk
-        # self.sort_asset()
+        self.sort_asset()
 
         # 更新site工程师
         self.engineer_main()
@@ -304,10 +304,10 @@ class TagData(View):
         # 过滤ONSITE资产
         for asset in Asset.objects.filter(tags='ONSITE'):
             # 若存在则不操作
-            if Bulk.objects.filter(asset=asset).count() or Apsa.objects.filter(asset=asset).count():
+            if Bulk.objects.filter(asset=asset).count() == 0 and Apsa.objects.filter(asset=asset).count() == 0:
                 name = asset.name
                 # 筛选出制氮机
-                if any(ele in name for ele in apsa_name_list) and 'WATER' not in name and 'FLOW' not in name:
+                if any(ele in name for ele in apsa_name_list) and 'WATER' not in name and 'FLOW' not in name and 'BULK' not in name:
                     if name.split('_')[0] == 'APSA':
                         onsite_type = 'APSA'
                         onsite_series = name.split('_')[1]
@@ -323,7 +323,7 @@ class TagData(View):
                     asset.is_apsa = 1
                     asset.save()
                 # 筛选出储罐
-                if 'BULK' in name and 'TOT' not in name:
+                elif 'BULK' in name:
                     b = Bulk(
                         asset=asset,
                     )
@@ -752,8 +752,10 @@ class AssetModelView(UpdateListRetrieveViewSet):
             if apsa == '1':
                 self.apsa = 1
                 apsa_id_list = [x.asset_id for x in Apsa.objects.all()]
-                if cal:
+                if cal == '1':
                     apsa_id_list = [x.asset_id for x in Apsa.objects.filter(daily_js__gte=1)]
+                elif cal == '0':
+                    apsa_id_list = [x.asset_id for x in Apsa.objects.filter(daily_js=0)]
                 self.queryset = self.queryset.filter(id__in=apsa_id_list)
                 if region:
                     self.queryset = self.queryset.filter(apsa__asset__site__engineer__region=region)
@@ -766,8 +768,10 @@ class AssetModelView(UpdateListRetrieveViewSet):
             else:
                 self.apsa = 0
                 bulk_id_list = [x.asset_id for x in Bulk.objects.all()]
-                if cal:
+                if cal == '1':
                     bulk_id_list = [x.asset_id for x in Bulk.objects.filter(filling_js__gte=1)]
+                elif cal == '0':
+                    bulk_id_list = [x.asset_id for x in Bulk.objects.filter(filling_js=0)]
                 self.queryset = self.queryset.filter(id__in=bulk_id_list)
                 if region:
                     self.queryset = self.queryset.filter(bulk__asset__site__engineer__region=region)
@@ -845,6 +849,7 @@ class AssetModelView(UpdateListRetrieveViewSet):
         if comment:
             asset.comment = comment
         asset.rtu_name = rtu_name
+        asset.confirm = 1
         site = Site.objects.get(id=site_dic['id'])
         site.engineer = User.objects.get(id=site_dic['engineer']['id'])
         try:
@@ -947,6 +952,7 @@ class AddOriginDataView(View):
 
 class AsyncJobView(View):
     """返回未完成任务"""
+
     def get(self, request):
         undone_tasks = AsyncJob.objects.filter(result='')
         res_list = []

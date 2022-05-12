@@ -14,8 +14,9 @@ urlpatterns = [
         views.FillingModelView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 
     # filling 月报
-    url(r'^monthly/filling/$', views.FillMonthlyView.as_view({'get': 'list'})),
-    url(r'^monthly/filling/(?P<pk>\d+)/$', views.FillMonthlyView.as_view({'put': 'update'})),
+    url(r'^monthly/filling/$', views.FillingMonthlyView.as_view({'get': 'list'})),
+    url(r'^monthly/filling/(?P<pk>\d+)/$', views.FillingMonthlyView.as_view({'put': 'update'})),
+    url(r'^monthly/filling/detail/$', views.FillingMonthlyDetailView.as_view()),
 
     # daily
     url(r'^daily/$', views.DailyModelView.as_view({'get': 'list'})),
@@ -38,10 +39,10 @@ urlpatterns = [
     # monthly variable
     url(r'^monthly/variable/$', views.MonthlyVariableModelView.as_view({'get': 'list', 'post': 'create'})),
     url(r'^monthly/variable/(?P<pk>\d+)/$',
-            views.MonthlyVariableModelView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
+        views.MonthlyVariableModelView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 
     # invoice variable diff
     url(r'^monthly/variable/diff/$', views.InvoiceDiffModelView.as_view({'get': 'list'})),
     url(r'^monthly/variable/diff/(?P<pk>\d+)/$',
-            views.InvoiceDiffModelView.as_view({'get': 'retrieve', 'put': 'update'})),
+        views.InvoiceDiffModelView.as_view({'get': 'retrieve', 'put': 'update'})),
 ]

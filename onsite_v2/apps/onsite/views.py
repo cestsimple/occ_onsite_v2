@@ -403,7 +403,7 @@ class DailyCalculate(View):
             default['t_end'] = self.t_start
 
             # 生成记录
-            default['change_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            default['change_date'] = datetime.now().strftime("%Y-%m-%d %H:%M")
             default['change_user'] = 'system'
             Malfunction.objects.update_or_create(
                 apsa=self.apsa, t_start=self.t_start, stop_label=default['stop_label'],
@@ -482,7 +482,8 @@ class FillMonthlyCalculate(APIView):
 
                 # 抓取时间范围内所有Filling记录(液态L)
                 f_quantity += sum([
-                    x.quantity for x in Filling.objects.filter(bulk=bulk, time_1__range=[self.start, self.end])
+                    x.quantity for x in
+                    Filling.objects.filter(confirm=1, bulk=bulk, time_1__range=[self.start, self.end])
                 ])
 
                 # 公式计算汇总记录(液态立方米) f = 始末液位*容积(M3) + 月度充液量(M3)
@@ -712,7 +713,7 @@ class FillingModelView(ModelViewSet):
         daily.save()
 
 
-class FillMonthlyView(ListUpdateViewSet):
+class FillingMonthlyView(ListUpdateViewSet):
     # 查询集
     queryset = FillingMonthly.objects.order_by('bulk__asset__site__engineer_region')
     # 序列化器
@@ -724,9 +725,9 @@ class FillMonthlyView(ListUpdateViewSet):
 
     def get_queryset(self):
         # 重写，添加条件过滤功能
-        querry = self.request.query_params
-        date = querry.get('date')
-        region = querry.get('region')
+        query = self.request.query_params
+        date = query.get('date')
+        region = query.get('region')
 
         if region:
             self.queryset = self.queryset.filter(bulk__asset__site__engineer__region=region)
@@ -735,6 +736,44 @@ class FillMonthlyView(ListUpdateViewSet):
             self.queryset = self.queryset.filter(date=date + '-7')
 
         return self.queryset
+
+
+class FillingMonthlyDetailView(APIView):
+    def get(self, request):
+        query = request.query_params
+        date = query.get('date')
+        region = query.get('region')
+
+        if not all([date, region]):
+            return Response('缺少参数', status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            filling_query = Filling.objects.filter(confirm=1)
+            if region:
+                filling_query = filling_query.filter(bulk__asset__site__engineer__region=region.upper())
+
+            if date:
+                month = int(date.split('-')[-1])
+                year = int(date.split('-')[0])
+                end = datetime(year, month, 1)
+                start = end + relativedelta(months=-1)
+                filling_query = filling_query.filter(time_1__range=[start, end])
+
+            res = []
+            for record in filling_query.order_by('bulk__asset__rtu_name'):
+                res.append({
+                    'rtu_name': record.bulk.asset.rtu_name,
+                    'asset_name': record.bulk.asset.name,
+                    'time_1': record.time_1.strftime("%Y-%m-%d %H:%M"),
+                    'time_2': record.time_2.strftime("%Y-%m-%d %H:%M"),
+                    'level_1': record.level_1,
+                    'level_2': record.level_2
+                })
+        except Exception as e:
+            print(e)
+            return Response('数据库错误', status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(res)
 
 
 class DailyModelView(ListUpdateViewSet):

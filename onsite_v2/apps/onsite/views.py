@@ -744,7 +744,7 @@ class FillingMonthlyDetailView(APIView):
         date = query.get('date')
         region = query.get('region')
 
-        if not all([date, region]):
+        if not date:
             return Response('缺少参数', status=status.HTTP_400_BAD_REQUEST)
 
         try:
@@ -767,7 +767,8 @@ class FillingMonthlyDetailView(APIView):
                     'time_1': record.time_1.strftime("%Y-%m-%d %H:%M"),
                     'time_2': record.time_2.strftime("%Y-%m-%d %H:%M"),
                     'level_1': record.level_1,
-                    'level_2': record.level_2
+                    'level_2': record.level_2,
+                    'quantity': round(record.quantity / 1000, 2)
                 })
         except Exception as e:
             print(e)

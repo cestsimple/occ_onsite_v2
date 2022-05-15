@@ -1,4 +1,4 @@
-import threading
+﻿import threading
 import time
 import requests
 from django.db import DatabaseError
@@ -37,7 +37,7 @@ def get_cognito():
             h = {
                 'Host': 'bos.iot.airliquide.com',
                 'Authorization': token,
-                'business-profile-id': '8e15368e-39c7-437f-9721-e5e54dcd207d',
+                'business-profile-id': '07b3ea43-99ac-4b34-9406-c97ce0360df6',
             }
             return h
 
@@ -64,7 +64,7 @@ def get_cognito():
     h = {
         'Host': 'bos.iot.airliquide.com',
         'Authorization': token,
-        'business-profile-id': '8e15368e-39c7-437f-9721-e5e54dcd207d',
+        'business-profile-id': '07b3ea43-99ac-4b34-9406-c97ce0360df6',
     }
     return h
 
@@ -490,73 +490,108 @@ class RecordData(View):
         return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
 
     def refresh_main(self):
+        print("Job started ...")
         h = get_cognito()
         # 遍历asset，获取确认过的再计算
         assets = [x for x in Asset.objects.filter(confirm=1, tags='onsite')]
         total_apsa = 0
         total_bulk = 0
+        total_record = 0
         # 获取assets对应变量,去除没有dailymark的
         for asset in assets:
-            variables = [x for x in Variable.objects.filter(asset=asset).filter(~Q(daily_mark=''))]
-            if asset.is_apsa and Apsa.objects.get(asset=asset).daily_js:
-                if len(variables) == 11 or len(variables) == 12:
-                    self.variables += variables
-                    total_apsa += 1
-                else:
-                    print(f"APSA variables总数验证错误：\n asset:{asset.rtu_name} 变量数:{len(variables)} \n: 变量名如下：")
-                    for i in variables:
-                        print(i.name)
-            elif not asset.is_apsa and Bulk.objects.get(asset=asset).filling_js:
-                if len(variables) == 1:
-                    self.variables += variables
-                    total_bulk += 1
-                else:
-                    print(f"BULK variables总数验证错误：\n asset:{asset.rtu_name}")
-        print(f"有{total_apsa}个apsa资产和{total_bulk}个bulk资产，共:{len(self.variables)}个变量")
+            try:
+                variables = [x for x in Variable.objects.filter(asset=asset).filter(~Q(daily_mark=''))]
+                if asset.is_apsa and Apsa.objects.get(asset=asset).daily_js:
+                    length = len(variables)
+                    if length == 11 or length == 12:
+                        self.variables += variables
+                        total_apsa += 1
+                        total_record += length * 2
+                    else:
+                        asset.confirm = 0
+                        asset.save()
+                        print(f"APSA variables总数验证错误：\n asset:{asset.rtu_name} 变量数:{length} \n: 变量名如下：")
+                        for i in variables:
+                            print(i.name)
+                elif not asset.is_apsa and Bulk.objects.get(asset=asset).filling_js:
+                    length = len(variables)
+                    if length == 1:
+                        self.variables += variables
+                        total_bulk += 1
+                        total_record += length * 144
+                    else:
+                        asset.confirm = 0
+                        asset.save()
+                        print(f"BULK variables总数验证错误：\n asset:{asset.rtu_name}")
+            except Exception as e:
+                print(e)
+                print(f"asset_id={asset.id},is_apsa={asset.is_apsa}")
+        print(f"有{total_apsa}个apsa和{total_bulk}个bulk,共:{len(self.variables)}个变量,预计{total_record}条记录")
         # 分发任务至子线程
-        multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.variables, h))
+        multi_thread_task(multi_num=12, target_task=self.refresh_sub, task_args=(self.variables, h))
         # 更新job状态
         jobs.update('IOT_RECORD', 'OK')
 
     def refresh_sub(self, variables, h):
-        for variable in variables:
+        retry_record = {}
+        thread = threading.currentThread()
+        variables_list = [x for x in variables]
+        total = len(variables_list)
+        while variables_list:
+            length = len(variables_list)
+            variable = variables_list[0]
             # 设定查询时间
             t = datetime.now()
             # IOT系统时间未UTC，会把我们的时间+8返回
             t_end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T17:00:00.000Z'
             t_start = (t + timedelta(days=-2)).strftime("%Y-%m-%d") + 'T15:00:00.000Z'
-            max_num = 5000
+            max_num = 50000
             url = f'{URL}/assets/{variable.asset.uuid}/variables/{variable.uuid}/' \
                   f'timeseries?start={t_start}&end={t_end}&limit={max_num}'
-
             try:
-                res = requests.get(url, headers=h).json()['timeseries']
-
-                daily_mark_list = [
-                    'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
-                    'H_STPDFT', 'H_STP400V', 'M3_PEAK',
-                ]
-                for i in res.keys():
-                    time_array = time.localtime(int(i[:-3]))
-                    t = time.strftime("%Y-%m-%d %H:%M", time_array)
-                    # 过滤
-                    value = res[i]
-                    if variable.daily_mark == 'LEVEL' and not t.endswith('0'):
-                        # 若是level，不要15分钟的点
-                        pass
-                    elif variable.daily_mark in daily_mark_list and not t.endswith('00:00'):
-                        # 若是M3_PEAK，只要零点的
-                        pass
-                    else:
-                        Record.objects.update_or_create(
-                            variable=variable, time=t,
-                            defaults={
-                                'time': t,
-                                'value': round(value, 2)
-                            }
-                        )
-            except Exception as e:
-                print(e)
+                res = requests.get(url, headers=h)
+                if res.status_code == 401:
+                    return
+                if res.status_code == 403:
+                    pass
+                else:
+                    res = res.json()['timeseries']
+                    daily_mark_list = [
+                        'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
+                        'H_STPDFT', 'H_STP400V', 'M3_PEAK',
+                    ]
+                    for i in res.keys():
+                        time_array = time.localtime(int(i[:-3]))
+                        t = time.strftime("%Y-%m-%d %H:%M", time_array)
+                        # 过滤
+                        value = res[i]
+                        if variable.daily_mark == 'LEVEL' and not t.endswith('0'):
+                            # 若是level，不要15分钟的点
+                            pass
+                        elif variable.daily_mark in daily_mark_list and not t.endswith('00:00'):
+                            # 若是M3_PEAK，只要零点的
+                            pass
+                        else:
+                            Record.objects.update_or_create(
+                                variable=variable, time=t,
+                                defaults={
+                                    'time': t,
+                                    'value': round(value, 2)
+                                }
+                            )
+                variables_list.remove(variable)
+            except Exception:
+                variables_list.remove(variable)
+                if variable.id in retry_record.keys():
+                    retry_record[variable.id] += 1
+                else:
+                    retry_record[variable.id] = 0
+                if retry_record[variable.id] < 20:
+                    variables_list.insert(length, variable)
+                    print(f'redo: {variable.id}')
+                    print(url)
+            print(f"{thread.getName()}-{thread.ident} progress: {length} / {total}")
+        print('*' * 100 + 'done')
 
 
 class SiteModelView(UpdateListRetrieveViewSet):

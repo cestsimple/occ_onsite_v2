@@ -37,7 +37,7 @@ def get_cognito():
             h = {
                 'Host': 'bos.iot.airliquide.com',
                 'Authorization': token,
-                'business-profile-id': '07b3ea43-99ac-4b34-9406-c97ce0360df6',
+                'business-profile-id': '8e15368e-39c7-437f-9721-e5e54dcd207d',
             }
             return h
 
@@ -64,7 +64,7 @@ def get_cognito():
     h = {
         'Host': 'bos.iot.airliquide.com',
         'Authorization': token,
-        'business-profile-id': '07b3ea43-99ac-4b34-9406-c97ce0360df6',
+        'business-profile-id': '8e15368e-39c7-437f-9721-e5e54dcd207d',
     }
     return h
 
@@ -142,13 +142,18 @@ class SiteData(View):
         for update_site in site_update_uuid:
             site = Site.objects.get(uuid=update_site)
             site.name = sites_iot_dic[update_site]['name']
+            if site.confirm == -1:
+                site.confirm = 0
             list_update.append(site)
 
         # 删除site
+        list_delete = []
         for delete_site in site_delete_uuid:
             site = Site.objects.get(uuid=delete_site)
-            site.confirm = -1
-            site.save()
+            if site.confirm != -1:
+                list_delete.append(site)
+                site.confirm = -1
+                site.save()
 
         # 批量写入数据库
         try:
@@ -157,6 +162,13 @@ class SiteData(View):
         except Exception as e:
             print(e)
             jobs.update('IOT_SITE', e)
+
+        # console输出
+        print(f"更新{len(list_update)}个site资产")
+        for x in list_create:
+            print(f"新建site资产: {x.name}")
+        for x in list_delete:
+            print(f"删除site资产: {x.name}")
 
         # 更新Job状态
         jobs.update('IOT_SITE', 'OK')
@@ -226,13 +238,18 @@ class AssetData(View):
             asset.name = assets_iot_dic[update_asset]['name']
             asset.status = assets_iot_dic[update_asset]['status']['name']
             asset.variables_num = assets_iot_dic[update_asset]['totalVariables']
+            if asset.confirm == -1:
+                asset.confirm = 0
             list_update.append(asset)
 
         # 删除
+        list_delete = []
         for delete_asset in asset_delete_uuid:
             asset = Asset.objects.get(uuid=delete_asset)
-            asset.confirm = -1
-            asset.save()
+            if asset.confirm != -1:
+                list_delete.append(asset)
+                asset.confirm = -1
+                asset.save()
 
         # 批量写入数据库
         try:
@@ -241,6 +258,13 @@ class AssetData(View):
         except Exception as e:
             print(e)
             jobs.update('IOT_ASSET', e)
+
+        # console输出
+        print(f"更新{len(list_update)}个asset资产")
+        for x in list_create:
+            print(f"新建asset资产: {x.name}")
+        for x in list_delete:
+            print(f"删除asset资产: {x.name}")
 
         # 更新Job状态
         jobs.update('IOT_ASSET', 'OK')
@@ -258,7 +282,8 @@ class TagData(View):
         # 是否强制全部刷新/部分刷新
         force = request.GET.get('force')
         if force:
-            self.assets = Asset.objects.all()
+            self.assets = Asset.objects.filter(confirm__gte=0)
+            print(f"强制刷新模式，共刷新{len(self.assets)}个tag")
         else:
             self.assets = Asset.objects.filter(tags='')
 
@@ -270,7 +295,7 @@ class TagData(View):
 
     def refresh_main(self):
         h = get_cognito()
-        multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.assets, h))
+        multi_thread_task(multi_num=15, target_task=self.refresh_sub, task_args=(self.assets, h))
 
         # 获取tags后对资产进行分类apsa/bulk
         self.sort_asset()
@@ -361,7 +386,6 @@ class TagData(View):
                 site.engineer = engineer[0]
             else:
                 site.engineer = User.objects.get(first_name='其他维修')
-                print(engineer_name)
             site.save()
 
     def get_engineer_name(self, name):
@@ -388,14 +412,15 @@ class VariableData(View):
             return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
 
         # 找出需要刷新的资产
-        for a in Asset.objects.filter(tags='ONSITE'):
-            variables_num_iot = a.variables_num
-            variables_num_db = Variable.objects.filter(asset=a).count()
-            # 不满足则添加到更新列表更新
-            if variables_num_iot != variables_num_db:
-                self.assets.append(a)
+        self.assets = Asset.objects.filter(tags='ONSITE')
+        # for a in Asset.objects.filter(tags='ONSITE'):
+        #     variables_num_iot = a.variables_num
+        #     variables_num_db = Variable.objects.filter(asset=a).count()
+        #     # 不满足则添加到更新列表更新
+        #     if variables_num_iot != variables_num_db:
+        #         self.assets.append(a)
 
-            # 创建子线程
+        # 创建子线程
         threading.Thread(target=self.refresh_main).start()
 
         # 返回相应结果
@@ -442,11 +467,12 @@ class VariableData(View):
             # 删除变量
             for variable_delete in variable_delete_uuid:
                 v = Variable.objects.get(uuid=variable_delete)
-                v.daily_mark = ''
-                v.confirm = -1
-                v.save()
-                # 删除变量记录
-                Record.objects.filter(variable=v).delete()
+                if v.confirm != -1:
+                    v.daily_mark = ''
+                    v.confirm = -1
+                    v.save()
+                    # 删除变量记录
+                    Record.objects.filter(variable=v).delete()
 
     def get_daily_mark(self, name, asset_name):
         # Daily标志列表
@@ -751,9 +777,12 @@ class VariableModelView(UpdateListRetrieveViewSet):
     def get_queryset(self):
         query_params = self.request.query_params
         asset = query_params.get('asset')
+        apsa = query_params.get('apsa')
 
         if asset:
             self.queryset = self.queryset.filter(asset__id=asset)
+        if apsa:
+            self.queryset = self.queryset.filter(asset__apsa__id=apsa)
 
         return self.queryset
 

@@ -99,16 +99,20 @@ class FillingMonthlySerializer(serializers.ModelSerializer):
         read_only_fields = ['rtu_name', 'asset_name', 'id', 'date', 'tank_size']
 
 
-class MonthlyVariableSerializer(serializers.ModelSerializer):
+class InvoiceVariableSerializer(serializers.ModelSerializer):
     rtu_name = serializers.SerializerMethodField()
+    variable_name = serializers.SerializerMethodField()
 
     def get_rtu_name(self, obj):
         return Asset.objects.get(apsa=obj.apsa).rtu_name
 
+    def get_variable_name(self, obj):
+        return obj.variable.name
+
     class Meta:
         model = MonthlyVariable
         fields = '__all__'
-        read_only_fields = ['rtu_name', 'id']
+        read_only_fields = ['rtu_name', 'id', 'variable_name']
 
 
 class InvoiceDiffSerializer(serializers.ModelSerializer):

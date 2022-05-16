@@ -17,7 +17,7 @@ from utils.CustomMixins import ListViewSet, RetrieveUpdateViewSet, ListUpdateVie
 from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail, FillingMonthly, MonthlyVariable, \
     InvoiceDiff
 from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer, \
-    FillingMonthlySerializer, MonthlyVariableSerializer, InvoiceDiffSerializer
+    FillingMonthlySerializer, InvoiceVariableSerializer, InvoiceDiffSerializer
 from utils import jobs
 from utils.pagination import PageNum
 
@@ -1114,7 +1114,7 @@ class MonthlyVariableModelView(ModelViewSet):
     # 查询集
     queryset = MonthlyVariable.objects.order_by('apsa__asset__site__engineer_region')
     # 序列化器
-    serializer_class = MonthlyVariableSerializer
+    serializer_class = InvoiceVariableSerializer
     # 指定分页器
     pagination_class = PageNum
     # 权限

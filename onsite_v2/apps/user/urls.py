@@ -9,7 +9,7 @@ urlpatterns = [
 
     # 获取用户数据
     url(r'^user/$', views.UserView.as_view({'get': 'list', 'post': 'create'})),
-    url(r'^user/(?P<pk>\d+)/$', views.UserView.as_view({'get': 'retrieve', 'put': 'update'})),
+    url(r'^user/(?P<pk>\d+)/$', views.UserView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 
     # 角色管理
     url(r'^user/role/$', views.RoleModelView.as_view({'get': 'list', 'post': 'create'})),

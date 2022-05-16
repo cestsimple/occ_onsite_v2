@@ -61,6 +61,7 @@ class UserView(ModelViewSet):
         region = request.data.get('region')
         group = request.data.get('group')
         email = request.data.get('email')
+        password = request.data.get('password')
 
         try:
             user = User.objects.get(id=pk)
@@ -73,6 +74,8 @@ class UserView(ModelViewSet):
             user.group = group
             user.email = email
             user.save()
+            if password != '' and password:
+                user.set_password(password.strip())
         except DatabaseError as e:
             print(e)
             return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)

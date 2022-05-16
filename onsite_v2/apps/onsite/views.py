@@ -1142,6 +1142,30 @@ class MonthlyVariableModelView(ModelViewSet):
 
         return self.queryset
 
+    def create(self, request, *args, **kwargs):
+        try:
+            apsa: int = request.data.get('apsa')
+            variable: int = request.data.get('variable')
+            usage: list[str] = request.data.get('usage')
+            apsa_obj = Apsa.objects.get(id=apsa)
+            variable_obj = Variable.objects.get(id=variable)
+            if not all([apsa, variable, usage]):
+                raise
+        except Exception:
+            return Response("参数错误", status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            for u in usage:
+                MonthlyVariable.objects.create(
+                    apsa=apsa_obj,
+                    variable=variable_obj,
+                    usage=u.upper()
+                )
+        except Exception:
+            return Response("内部错误", status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'status': 200, 'msg': 'ok'})
+
 
 class InvoiceDiffModelView(ModelViewSet):
     # 查询集
@@ -1170,3 +1194,4 @@ class InvoiceDiffModelView(ModelViewSet):
             self.queryset = self.queryset.filter(usage=usage.upper())
 
         return self.queryset
+

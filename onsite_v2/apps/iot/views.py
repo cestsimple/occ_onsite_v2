@@ -8,6 +8,7 @@ from pycognito import Cognito
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
@@ -332,7 +333,8 @@ class TagData(View):
             if Bulk.objects.filter(asset=asset).count() == 0 and Apsa.objects.filter(asset=asset).count() == 0:
                 name = asset.name
                 # 筛选出制氮机
-                if any(ele in name for ele in apsa_name_list) and 'WATER' not in name and 'FLOW' not in name and 'BULK' not in name:
+                if any(ele in name for ele in
+                       apsa_name_list) and 'WATER' not in name and 'FLOW' not in name and 'BULK' not in name:
                     if name.split('_')[0] == 'APSA':
                         onsite_type = 'APSA'
                         onsite_series = name.split('_')[1]
@@ -1041,3 +1043,70 @@ class AsyncJobView(View):
             'msg': 'ok',
             'res': res_list
         })
+
+
+class RefreshAllAsset(APIView):
+    def get(self, request):
+        if jobs.check('IOT_SITE', silent=True) or \
+                jobs.check('IOT_ASSET', silent=True) or \
+                jobs.check('IOT_TAG', silent=True) or \
+                jobs.check('IOT_VARIABLE', silent=True) or \
+                jobs.check('IOT_ALL', silent=True):
+            return Response('任务已存在', status=400)
+
+        time.sleep(2)
+        threading.Thread(target=self.sub, args=(request,)).start()
+        return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新所有iot资产'})
+
+    def sub(self, request):
+        # 获取当前时间，设定任务最大时间
+        time_now = datetime.now()
+        t_start = int(time.time())
+        max_duration = 60 * 60  # secs
+
+        # 创建任务实例
+        site = SiteData()
+        asset = AssetData()
+        tag = TagData()
+        variable = VariableData()
+
+        site_done = 0
+        asset_done = 0
+        tag_done = 0
+        variable_done = 0
+
+        # 按照顺序执行任务
+        while time.time() - t_start < max_duration:
+            # 开始site
+            if not site_done:
+                site.get(request)
+                site_done = 1
+
+            # 检测上一个任务完成再做
+            job = AsyncJob.objects.filter(name='IOT_SITE', start_time__gt=time_now, result='OK')
+            if job.count() == 1 and not asset_done:
+                print("IOT_SITE完成")
+                asset.get(request)
+                asset_done = 1
+
+            job = AsyncJob.objects.filter(name='IOT_ASSET', start_time__gt=time_now, result='OK')
+            if job.count() == 1 and not tag_done:
+                print("IOT_ASSET完成")
+                tag.get(request)
+                tag_done = 1
+
+            job = AsyncJob.objects.filter(name='IOT_TAG', start_time__gt=time_now, result='OK')
+            if job.count() == 1 and not variable_done:
+                print("IOT_TAG完成")
+                variable.get(request)
+                variable_done = 1
+
+            job = AsyncJob.objects.filter(name='IOT_VARIABLE', start_time__gt=time_now, result='OK')
+            if job.count() == 1:
+                print("IOT_VARIABLE完成")
+                # 任务完成，返回
+                jobs.update('IOT_ALL', 'OK')
+                return
+            time.sleep(5)
+        # 刷新超时，计入失败
+        jobs.update('IOT_ALL', 'ERROR: TIME OUT')

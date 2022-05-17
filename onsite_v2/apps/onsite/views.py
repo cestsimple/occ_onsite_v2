@@ -1156,11 +1156,12 @@ class MonthlyVariableModelView(ModelViewSet):
 
         try:
             for u in usage:
-                MonthlyVariable.objects.create(
-                    apsa=apsa_obj,
-                    variable=variable_obj,
-                    usage=u.upper()
-                )
+                if not MonthlyVariable.objects.filter(apsa=apsa, variable=variable, usage=u).filter():
+                    MonthlyVariable.objects.create(
+                        apsa=apsa_obj,
+                        variable=variable_obj,
+                        usage=u.upper()
+                    )
         except Exception:
             return Response("内部错误", status=status.HTTP_400_BAD_REQUEST)
 

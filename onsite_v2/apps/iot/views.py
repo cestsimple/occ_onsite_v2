@@ -519,6 +519,7 @@ class RecordData(View):
 
     def refresh_main(self):
         print("Job started ...")
+        # 获取请求头
         h = get_cognito()
         # 遍历asset，获取确认过的再计算
         assets = [x for x in Asset.objects.filter(confirm=1, tags='onsite')]
@@ -561,11 +562,13 @@ class RecordData(View):
         jobs.update('IOT_RECORD', 'OK')
 
     def refresh_sub(self, variables, h):
+        # 设置超时时间
+        time_now: int = int(time.time())
+        max_duration: int = 60 * 60  # secs
+        # 设置重试列表
         retry_record = {}
-        thread = threading.currentThread()
         variables_list = [x for x in variables]
-        total = len(variables_list)
-        while variables_list:
+        while len(variables_list) != 0 and (time.time() - time_now < max_duration):
             length = len(variables_list)
             variable = variables_list[0]
             # 设定查询时间
@@ -617,9 +620,6 @@ class RecordData(View):
                 if retry_record[variable.id] < 20:
                     variables_list.insert(length, variable)
                     print(f'redo: {variable.id}')
-                    print(url)
-            print(f"{thread.getName()}-{thread.ident} progress: {length} / {total}")
-        print('*' * 100 + 'done')
 
 
 class SiteModelView(UpdateListRetrieveViewSet):
@@ -820,11 +820,21 @@ class AssetModelView(UpdateListRetrieveViewSet):
         confirm = self.request.query_params.get('confirm')
         cal = self.request.query_params.get('cal')
         region = self.request.query_params.get('region')
+        queryset = self.queryset
 
-        if confirm != '':
-            self.queryset = self.queryset.filter(confirm=confirm)
+        if confirm is not None and confirm != '':
+            queryset = queryset.filter(confirm=confirm)
 
         if self.action == 'list':
+            if name:
+                name = name.strip().upper()
+                queryset = queryset.filter(
+                    Q(rtu_name__contains=name) | Q(site__name__contains=name)
+                )
+
+            if region:
+                queryset = queryset.filter(site__engineer__region=region)
+
             if apsa == '1':
                 self.apsa = 1
                 apsa_id_list = [x.asset_id for x in Apsa.objects.all()]
@@ -832,33 +842,17 @@ class AssetModelView(UpdateListRetrieveViewSet):
                     apsa_id_list = [x.asset_id for x in Apsa.objects.filter(daily_js__gte=1)]
                 elif cal == '0':
                     apsa_id_list = [x.asset_id for x in Apsa.objects.filter(daily_js=0)]
-                self.queryset = self.queryset.filter(id__in=apsa_id_list)
-                if region:
-                    self.queryset = self.queryset.filter(apsa__asset__site__engineer__region=region)
-
-                if name:
-                    name = name.strip().upper()
-                    self.queryset = self.queryset.filter(
-                        Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
-                    )
-            else:
+                queryset = queryset.filter(id__in=apsa_id_list)
+            elif apsa == '0':
                 self.apsa = 0
                 bulk_id_list = [x.asset_id for x in Bulk.objects.all()]
                 if cal == '1':
                     bulk_id_list = [x.asset_id for x in Bulk.objects.filter(filling_js__gte=1)]
                 elif cal == '0':
                     bulk_id_list = [x.asset_id for x in Bulk.objects.filter(filling_js=0)]
-                self.queryset = self.queryset.filter(id__in=bulk_id_list)
-                if region:
-                    self.queryset = self.queryset.filter(bulk__asset__site__engineer__region=region)
+                queryset = queryset.filter(id__in=bulk_id_list)
 
-                if name:
-                    name = name.strip().upper()
-                    self.queryset = self.queryset.filter(
-                        Q(bulk__asset__rtu_name__contains=name) | Q(bulk__asset__site__name__contains=name)
-                    )
-
-        return self.queryset
+        return queryset
 
     # 根据is_apsa使用不同序列化器
     def get_serializer_class(self):
@@ -924,10 +918,12 @@ class AssetModelView(UpdateListRetrieveViewSet):
         # 保存asset和site
         if comment:
             asset.comment = comment
-        asset.rtu_name = rtu_name
-        asset.confirm = 1
         site = Site.objects.get(id=site_dic['id'])
         site.engineer = User.objects.get(id=site_dic['engineer']['id'])
+        for a in Asset.objects.filter(site=site):
+            a.rtu_name = rtu_name
+            a.save()
+        asset.confirm = 1
         try:
             if bulk_dic:
                 bulk.save()

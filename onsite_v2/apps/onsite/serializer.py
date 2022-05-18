@@ -40,6 +40,7 @@ class MalfunctionSerializer(serializers.ModelSerializer):
     asset_name = serializers.SerializerMethodField()
     rtu_name = serializers.SerializerMethodField()
     avg_con = serializers.SerializerMethodField()
+    facility_fin = serializers.SerializerMethodField()
 
     def get_asset_name(self, obj):
         return Asset.objects.get(apsa=obj.apsa).name
@@ -51,6 +52,9 @@ class MalfunctionSerializer(serializers.ModelSerializer):
         if obj.stop_hour:
             return round(obj.stop_consumption / obj.stop_hour, 2)
         return 0
+
+    def get_facility_fin(self, obj):
+        return obj.apsa.facility_fin
 
     class Meta:
         model = Malfunction

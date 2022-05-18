@@ -371,24 +371,27 @@ class TagData(View):
     def engineer_sub(self, sites, h):
         for site in sites:
             url = f'{URL}/sites/{site.uuid}/tags'
-            res = requests.get(url, headers=h).json()
+            try:
+                res = requests.get(url, headers=h).json()
 
-            for tag in res['content']:
-                if tag['name'] != 'PHASE' and tag['name'] != 'BUSINESS_LINE':
-                    try:
-                        tag_content = tag['labels'][0]['name']
-                    except IndexError:
-                        print(f'错误！  {url}')
-                        tag_content = ''
-                    break
+                for tag in res['content']:
+                    if tag['name'] != 'PHASE' and tag['name'] != 'BUSINESS_LINE':
+                        try:
+                            tag_content = tag['labels'][0]['name']
+                        except IndexError:
+                            print(f'错误！  {url}')
+                            tag_content = ''
+                        break
 
-            engineer_name = self.get_engineer_name(tag_content)
-            engineer = User.objects.filter(first_name=engineer_name)
-            if engineer.count() == 1:
-                site.engineer = engineer[0]
-            else:
-                site.engineer = User.objects.get(first_name='其他维修')
-            site.save()
+                engineer_name = self.get_engineer_name(tag_content)
+                engineer = User.objects.filter(first_name=engineer_name)
+                if engineer.count() == 1:
+                    site.engineer = engineer[0]
+                else:
+                    site.engineer = User.objects.get(first_name='其他维修')
+                site.save()
+            except Exception:
+                pass
 
     def get_engineer_name(self, name):
         name = name.replace(' ', '')
@@ -873,6 +876,7 @@ class AssetModelView(UpdateListRetrieveViewSet):
         apsa_dic = request.data.get('apsa')
         bulk_dic = request.data.get('bulk')
         site_dic = request.data.get('site')
+        confirm = request.data.get('confirm')
         asset = Asset.objects.get(id=pk)
 
         if apsa_dic:
@@ -896,6 +900,10 @@ class AssetModelView(UpdateListRetrieveViewSet):
                     apsa.flow_meter = apsa_dic['flow_meter']
                 if apsa_dic['facility_fin']:
                     apsa.facility_fin = apsa_dic['facility_fin']
+                # 如果常规计算则需要清空bind和fixed
+                if apsa.daily_js == 1:
+                    apsa.daily_bind = -1
+                    apsa.cooling_fixed = 0
             except DatabaseError as e:
                 print(e)
                 return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
@@ -923,7 +931,7 @@ class AssetModelView(UpdateListRetrieveViewSet):
         for a in Asset.objects.filter(site=site):
             a.rtu_name = rtu_name
             a.save()
-        asset.confirm = 1
+        asset.confirm = confirm
         try:
             if bulk_dic:
                 bulk.save()
@@ -1047,10 +1055,9 @@ class RefreshAllAsset(APIView):
                 jobs.check('IOT_ASSET', silent=True) or \
                 jobs.check('IOT_TAG', silent=True) or \
                 jobs.check('IOT_VARIABLE', silent=True) or \
-                jobs.check('IOT_ALL', silent=True):
+                jobs.check('IOT_ALL'):
             return Response('任务已存在', status=400)
 
-        time.sleep(2)
         threading.Thread(target=self.sub, args=(request,)).start()
         return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新所有iot资产'})
 

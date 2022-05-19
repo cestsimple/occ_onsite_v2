@@ -647,6 +647,7 @@ class FillingModelView(ModelViewSet):
         time_2 = request.data.get('time_2')
         level_1 = float(request.data.get('level_1'))
         level_2 = float(request.data.get('level_2'))
+        confirm = float(request.data.get('confirm'))
 
         # 验证是否存在充液记录
         if Filling.objects.filter(bulk=bulk, time_1=time_1).count() != 0:
@@ -662,7 +663,7 @@ class FillingModelView(ModelViewSet):
                 level_1=level_1,
                 level_2=level_2,
                 quantity=quantity,
-                confirm=1
+                confirm=confirm
             )
             self.update_lin_tot(filling, quantity)
             filling.save()
@@ -680,6 +681,7 @@ class FillingModelView(ModelViewSet):
         time_2 = request.data.get('time_2')
         level_1 = float(request.data.get('level_1'))
         level_2 = float(request.data.get('level_2'))
+        confirm = float(request.data.get('confirm'))
         tank_size = float(Bulk.objects.get(id=bulk).tank_size)
         quantity = round((level_2 - level_1) / 100 * tank_size * 1000, 2)  # 液体L
         # 保存数据
@@ -690,7 +692,7 @@ class FillingModelView(ModelViewSet):
             filling.level_2 = level_2
             self.update_lin_tot(filling, quantity - filling.quantity)
             filling.quantity = quantity
-            filling.confirm = 1
+            filling.confirm = confirm
             filling.save()
         except DatabaseError as e:
             return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
@@ -792,7 +794,7 @@ class FillingMonthlyDetailView(APIView):
 
 class DailyModelView(ListUpdateViewSet):
     # 查询集
-    queryset = Daily.objects.order_by('confirm', 'apsa__asset__site__engineer__region', 'apsa__onsite_series',
+    queryset = Daily.objects.order_by('confirm', 'apsa__asset__site__engineer__region', '-apsa__onsite_series',
                                       'apsa__asset__rtu_name')
     # 序列化器
     serializer_class = DailySerializer
@@ -938,7 +940,7 @@ class DailyModModelView(RetrieveUpdateViewSet):
 
 class MalfunctionModelView(ModelViewSet):
     # 查询集
-    queryset = Malfunction.objects.all().order_by('apsa__asset__site__engineer__region', 'apsa__onsite_series')
+    queryset = Malfunction.objects.all().order_by('apsa__asset__site__engineer__region', 'apsa__onsite_series', 't_start')
     # 序列化器
     serializer_class = MalfunctionSerializer
     # 指定分页器

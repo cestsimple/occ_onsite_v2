@@ -508,8 +508,13 @@ class VariableData(View):
 class RecordData(View):
     def __init__(self):
         self.variables = []
+        self.assets = []
+        self.apsa_list: list[int] = []
 
     def get(self, request):
+        # 获取部分刷新列表
+        self.apsa_list = request.GET.getlist('apsa_list[]', [])
+
         # 检查Job状态
         if jobs.check('IOT_RECORD'):
             return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
@@ -525,12 +530,15 @@ class RecordData(View):
         # 获取请求头
         h = get_cognito()
         # 遍历asset，获取确认过的再计算
-        assets = [x for x in Asset.objects.filter(confirm=1, tags='onsite')]
+        self.assets = Asset.objects.filter(confirm=1, tags='onsite')
+        # 如果是部分请求，则过滤
+        self.partially_filter()
+
         total_apsa = 0
         total_bulk = 0
         total_record = 0
         # 获取assets对应变量,去除没有dailymark的
-        for asset in assets:
+        for asset in self.assets:
             try:
                 variables = [x for x in Variable.objects.filter(asset=asset).filter(~Q(daily_mark=''))]
                 if asset.is_apsa and Apsa.objects.get(asset=asset).daily_js:
@@ -623,6 +631,12 @@ class RecordData(View):
                 if retry_record[variable.id] < 20:
                     variables_list.insert(length, variable)
                     print(f'redo: {variable.id}')
+
+    def partially_filter(self):
+        apsa_list = [int(x) for x in self.apsa_list]
+        id_list = [x.id for x in Asset.objects.filter(apsa__in=apsa_list)]
+        if self.apsa_list:
+            self.assets = self.assets.filter(id__in=id_list)
 
 
 class SiteModelView(UpdateListRetrieveViewSet):

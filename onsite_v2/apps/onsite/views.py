@@ -347,32 +347,45 @@ class DailyCalculate(View):
         )
 
     def generate_daily_mod(self):
-        res = {
-            'user': 'SYSTEM'
-        }
+        comment = ''
         if self.error:
             # 获取报错变量信息，并对数据长度进行检查
             comment = '报错变量:' + f"{'|'.join(self.error_variables)}"
             if len(comment) > 300:
                 comment = comment[:300]
-            res['comment'] = comment
 
         try:
-            # 创建APSA自己的MOD数据
-            DailyMod.objects.update_or_create(
-                apsa=self.apsa, date=self.t_start,
-                defaults=res
-            )
+            # 创建自己的MOD数据
+            daily_mod = DailyMod.objects.filter(apsa=self.apsa, date=self.t_start)
+            if daily_mod.count() == 1:
+                daily_mod = daily_mod[0]
+                daily_mod.comment = comment
+                daily_mod.user = 'SYSTEM'
+                daily_mod.save()
+            else:
+                DailyMod.objects.create(
+                    apsa=self.apsa,
+                    date=self.t_start,
+                    comment=comment,
+                    user='SYSTEM'
+                )
 
             # 若为从气站，需要创建第两条mod数据，更新主机的mod数据
             if self.apsa.daily_js == 2:
                 apsa = Apsa.objects.get(id=self.apsa.daily_bind)
-                DailyMod.objects.update_or_create(
-                    apsa=apsa, date=self.t_start,
-                    defaults={
-                        'lin_tot_mod': -self.daily_res['lin_tot']
-                    }
-                )
+                bind_daily_mod = DailyMod.objects.filter(apsa=apsa, date=self.t_start)
+                if bind_daily_mod.count() == 1:
+                    # 若已存在记录则，更新lin_tot_mod
+                    bind_daily_mod = bind_daily_mod[0]
+                    bind_daily_mod.lin_tot_mod -= self.daily_res['lin_tot']
+                    bind_daily_mod.save()
+                else:
+                    DailyMod.objects.create(
+                        apsa=apsa,
+                        date=self.t_start,
+                        lin_tot_mod=(-self.daily_res['lin_tot']),
+                        user='SYSTEM'
+                    )
         except Exception as e:
             print(e)
 

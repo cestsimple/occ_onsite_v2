@@ -176,12 +176,15 @@ class DailyCalculate(View):
             'lin_tot': 0,
             'flow_meter': 0,
         }
+        #  部分刷新列表
+        self.refresh_list: list[int] = []
 
     def get(self, request):
         # 获取daily日期参数
         query_params = request.GET
         start = query_params.get('start')
         end = query_params.get('end')
+        self.refresh_list = query_params.get('apsa_list')
 
         # 检查Job状态
         if jobs.check('ONSITE_DAILY'):
@@ -212,6 +215,10 @@ class DailyCalculate(View):
 
         # 查询所有需要计算的Apsa
         apsas = Apsa.objects.filter(daily_js__gte=1, asset__confirm=1).order_by('daily_js')
+
+        # 过滤参数中传入的气站
+        if self.refresh_list:
+            apsas.filter(id__in=self.refresh_list)
 
         for apsa in apsas:
             # 传递apsa全局使用

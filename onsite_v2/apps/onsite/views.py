@@ -320,7 +320,7 @@ class DailyCalculate(View):
         lin_tot = round((filling_quantity + lin_bulks) / 1000 * 650 * (273.15 + self.apsa.temperature) / 273.15, 2)
 
         # 保存数据
-        self.daily_res['lin_tot'] = lin_tot
+        self.daily_res['lin_tot'] = round(lin_tot, 2)
         self.daily_res['filling'] = round(filling_quantity, 2)
 
     def get_lin_tot_complex(self):
@@ -336,7 +336,7 @@ class DailyCalculate(View):
         lin_tot += self.daily_res['m3_q6'] + self.daily_res['m3_q7'] + self.daily_res['m3_peak']
 
         # 保存数据
-        self.daily_res['lin_tot'] = lin_tot
+        self.daily_res['lin_tot'] = round(lin_tot, 2)
 
     def generate_daily(self):
         # 生成成功daily
@@ -365,34 +365,22 @@ class DailyCalculate(View):
             # 创建自己的MOD数据
             daily_mod = DailyMod.objects.filter(apsa=self.apsa, date=self.t_start)
             if daily_mod.count() == 1:
-                daily_mod = daily_mod[0]
-                daily_mod.comment = comment
-                daily_mod.user = 'SYSTEM'
-                daily_mod.save()
-            else:
-                DailyMod.objects.create(
-                    apsa=self.apsa,
-                    date=self.t_start,
-                    comment=comment,
-                    user='SYSTEM'
-                )
+                # 若已存在daily_mod说明是重跑，则先删除mod
+                daily_mod[0].delete()
+
+            DailyMod.objects.create(
+                apsa=self.apsa,
+                date=self.t_start,
+                comment=comment,
+                user='SYSTEM'
+            )
 
             # 若为从气站，需要创建第两条mod数据，更新主机的mod数据
             if self.apsa.daily_js == 2:
                 apsa = Apsa.objects.get(id=self.apsa.daily_bind)
-                bind_daily_mod = DailyMod.objects.filter(apsa=apsa, date=self.t_start)
-                if bind_daily_mod.count() == 1:
-                    # 若已存在记录则，更新lin_tot_mod
-                    bind_daily_mod = bind_daily_mod[0]
-                    bind_daily_mod.lin_tot_mod -= self.daily_res['lin_tot']
-                    bind_daily_mod.save()
-                else:
-                    DailyMod.objects.create(
-                        apsa=apsa,
-                        date=self.t_start,
-                        lin_tot_mod=(-self.daily_res['lin_tot']),
-                        user='SYSTEM'
-                    )
+                bind_daily_mod = DailyMod.objects.get(apsa=apsa, date=self.t_start)
+                bind_daily_mod.lin_tot_mod -= round(self.daily_res['lin_tot'], 2)
+                bind_daily_mod.save()
         except Exception as e:
             print(e)
 
@@ -877,7 +865,7 @@ class DailyModelView(ListUpdateViewSet):
             dif_peak = v_peak - peak
             lin_consume = d['m3_q6'] + mod.m3_q6_mod + d['m3_q7'] + mod.m3_q7_mod
             mod_id = mod.id
-            if apsa.cooling_fixed:
+            if apsa.cooling_fixed and apsa.daily_js == 2:
                 cooling = apsa.cooling_fixed
             else:
                 cooling = ((lin_tot - peak - lin_consume) / m3_prod * 100) if m3_prod else 0
@@ -947,7 +935,8 @@ class DailyModModelView(RetrieveUpdateViewSet):
 
 class MalfunctionModelView(ModelViewSet):
     # 查询集
-    queryset = Malfunction.objects.all().order_by('apsa__asset__site__engineer__region', 'apsa__onsite_series', 't_start')
+    queryset = Malfunction.objects.all().order_by('apsa__asset__site__engineer__region', 'apsa__onsite_series',
+                                                  't_start')
     # 序列化器
     serializer_class = MalfunctionSerializer
     # 指定分页器
@@ -1217,4 +1206,3 @@ class InvoiceDiffModelView(ModelViewSet):
             self.queryset = self.queryset.filter(usage=usage.upper())
 
         return self.queryset
-

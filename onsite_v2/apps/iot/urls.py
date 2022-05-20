@@ -34,5 +34,6 @@ urlpatterns = [
     url(r'^iot/origin/$', views.AddOriginDataView.as_view()),
 
     # job
-    url(r'^asyncjob/$', views.AsyncJobView.as_view())
+    url(r'^asyncjob/$', views.AsyncJobModelView.as_view({'get': 'list'})),
+    url(r'^asyncjob/(?P<pk>\d+)/$', views.AsyncJobModelView.as_view({'delete': 'destroy'}))
 ]

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
-from .models import Site, Apsa, Bulk, Variable, Asset
+from .models import Site, Apsa, Bulk, Variable, Asset, AsyncJob
 from apps.user.models import User
 
 
@@ -67,7 +67,7 @@ class AssetApsaSerializer(ModelSerializer):
     def get_apsa(self, obj):
         apsa_obj = Apsa.objects.get(asset=obj)
         return {
-            'id':apsa_obj.id,
+            'id': apsa_obj.id,
             'onsite_type': apsa_obj.onsite_type,
             'onsite_series': apsa_obj.onsite_series,
             'facility_fin': apsa_obj.facility_fin,
@@ -119,3 +119,9 @@ class VariableSerializer(ModelSerializer):
     class Meta:
         model = Variable
         exclude = ('asset', 'uuid',)
+
+
+class AsyncJobSerializer(ModelSerializer):
+    class Meta:
+        model = AsyncJob
+        fields = '__all__'

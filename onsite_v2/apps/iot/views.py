@@ -9,14 +9,14 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-
+from rest_framework import mixins, viewsets
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
 from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record, OriginAssetData
 from datetime import datetime, timedelta
 from utils import jobs
 from .serializer import SiteSerializer, ApsaSerializer, BulkSerializer, VariableSerializer, AssetApsaSerializer, \
-    AssetBulkSerializer
+    AssetBulkSerializer, AsyncJobSerializer
 from ..user.models import User
 from django.db.models import Q
 
@@ -562,7 +562,7 @@ class RecordData(View):
                 print(f"asset_id={asset.id},is_apsa={asset.is_apsa}")
         print(f"有{total_apsa}个apsa和{total_bulk}个bulk,共:{len(self.variables)}个变量,预计{total_record}条记录")
         # 分发任务至子线程
-        multi_thread_task(multi_num=12, target_task=self.refresh_sub, task_args=(self.variables, h))
+        multi_thread_task(multi_num=8, target_task=self.refresh_sub, task_args=(self.variables, h))
         # 更新job状态
         jobs.update('IOT_RECORD', 'OK')
 
@@ -1046,23 +1046,36 @@ class AddOriginDataView(View):
         return JsonResponse({'status': 200})
 
 
-class AsyncJobView(View):
-    """返回未完成任务"""
+class AsyncJobModelView(mixins.ListModelMixin,
+                   mixins.DestroyModelMixin,
+                   viewsets.GenericViewSet):
+    """返回任务"""
+    queryset = AsyncJob.objects.filter(~Q(name='IOT_TOKEN'))
+    # 序列化器
+    serializer_class = AsyncJobSerializer
+    # 权限
+    permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        undone_tasks = AsyncJob.objects.filter(result='')
-        res_list = []
-        for task in undone_tasks:
-            res_list.append({
-                'id': task.id,
-                'name': task.name,
-                'start_time': task.start_time
-            })
-        return JsonResponse({
-            'status': 200,
-            'msg': 'ok',
-            'res': res_list
-        })
+    def get_queryset(self):
+        # 获取请求参数
+        finish: str = self.request.query_params.get('finish')
+        success: str = self.request.query_params.get('success')
+
+        query_set = self.queryset
+        # 过滤筛选
+        if finish:
+            if finish == '1':
+                query_set = query_set.filter(~Q(finish_time=None))
+            else:
+                query_set = query_set.filter(finish_time=None)
+
+        if success:
+            if success == '1':
+                query_set = query_set.filter(result='OK')
+            else:
+                query_set = query_set.filter(~Q(result='OK'))
+
+        return query_set
 
 
 class RefreshAllAsset(APIView):

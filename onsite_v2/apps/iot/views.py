@@ -9,7 +9,8 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import mixins, viewsets
+from rest_framework.viewsets import ModelViewSet
+
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
 from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record, OriginAssetData
@@ -1046,11 +1047,9 @@ class AddOriginDataView(View):
         return JsonResponse({'status': 200})
 
 
-class AsyncJobModelView(mixins.ListModelMixin,
-                   mixins.DestroyModelMixin,
-                   viewsets.GenericViewSet):
+class AsyncJobModelView(ModelViewSet):
     """返回任务"""
-    queryset = AsyncJob.objects.filter(~Q(name='IOT_TOKEN'))
+    queryset = AsyncJob.objects.all()
     # 序列化器
     serializer_class = AsyncJobSerializer
     # 权限
@@ -1075,7 +1074,7 @@ class AsyncJobModelView(mixins.ListModelMixin,
             else:
                 query_set = query_set.filter(~Q(result='OK'))
 
-        return query_set
+        return query_set.filter(~Q(name='IOT_TOKEN'))
 
 
 class RefreshAllAsset(APIView):

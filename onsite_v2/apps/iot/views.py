@@ -297,7 +297,7 @@ class TagData(View):
 
     def refresh_main(self):
         h = get_cognito()
-        multi_thread_task(multi_num=15, target_task=self.refresh_sub, task_args=(self.assets, h))
+        multi_thread_task(multi_num=8, target_task=self.refresh_sub, task_args=(self.assets, h))
 
         # 获取tags后对资产进行分类apsa/bulk
         self.sort_asset()
@@ -367,7 +367,7 @@ class TagData(View):
             x.site_id for x in Asset.objects.filter(tags='ONSITE')
         ]).distinct()
         h = get_cognito()
-        multi_thread_task(multi_num=10, target_task=self.engineer_sub, task_args=(sites_obj, h))
+        multi_thread_task(multi_num=8, target_task=self.engineer_sub, task_args=(sites_obj, h))
 
     def engineer_sub(self, sites, h):
         for site in sites:
@@ -428,7 +428,7 @@ class VariableData(View):
 
     def refresh_main(self):
         h = get_cognito()
-        multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.assets, h))
+        multi_thread_task(multi_num=8, target_task=self.refresh_sub, task_args=(self.assets, h))
         jobs.update('IOT_VARIABLE', 'OK')
 
     def refresh_sub(self, assets, h):
@@ -563,14 +563,14 @@ class RecordData(View):
                 print(f"asset_id={asset.id},is_apsa={asset.is_apsa}")
         print(f"有{total_apsa}个apsa和{total_bulk}个bulk,共:{len(self.variables)}个变量,预计{total_record}条记录")
         # 分发任务至子线程
-        multi_thread_task(multi_num=8, target_task=self.refresh_sub, task_args=(self.variables, h))
+        multi_thread_task(multi_num=4, target_task=self.refresh_sub, task_args=(self.variables, h))
         # 更新job状态
         jobs.update('IOT_RECORD', 'OK')
 
     def refresh_sub(self, variables, h):
         # 设置超时时间
         time_now: int = int(time.time())
-        max_duration: int = 60 * 60  # secs
+        max_duration: int = 60 * 30  # secs
         # 设置重试列表
         retry_record = {}
         variables_list = [x for x in variables]

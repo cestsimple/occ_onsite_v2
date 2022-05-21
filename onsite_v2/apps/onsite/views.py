@@ -211,7 +211,6 @@ class DailyCalculate(View):
     def calculate_main(self, c_date):
         # 设定时间(参数：时间字符串)
         self.set_time(c_date)
-        t_start = self.t_start
 
         # 查询所有需要计算的Apsa
         apsas = Apsa.objects.filter(daily_js__gte=1, asset__confirm=1).order_by('daily_js')
@@ -228,14 +227,17 @@ class DailyCalculate(View):
             self.get_daily_res()
             d_res = self.daily_res
 
-            # 如果数据源错误，可以计算lin_tot的继续计算
-            if d_res['m3_prod'] >= 0 and d_res['m3_q6'] >= 0 and d_res['m3_q7'] >= 0 and d_res['m3_peak'] >= 0:
+            # 如果数据源错误，可以计算lin_tot的继续计算 (设备有可能会抖动，导致累积量出现小的负值)
+            if apsa.daily_js == 1 or apsa.daily_js == 5:
                 # 单机apsa计算
-                if apsa.daily_js == 1:
-                    self.get_lin_tot_simple()
-                # 共用apsa计算(该机器固定补冷)
-                if apsa.daily_js == 2:
+                self.get_lin_tot_simple()
+            else:
+                if d_res['m3_prod'] >= -0.99 and d_res['m3_q6'] >= -0.99 and d_res['m3_q7'] >= -0.99 and d_res['m3_peak'] >= -0.99:
+                    # 共用apsa计算(该机器固定补冷)
                     self.get_lin_tot_complex()
+                else:
+                    self.error = 1
+                    self.error_variables.append('m3出现负数')
 
             # 若有停机写入停机
             self.generate_malfunction()
@@ -333,7 +335,7 @@ class DailyCalculate(View):
 
         # 根据cooling反推lin_tot，再加上停机用液和Peak
         lin_tot = round(self.daily_res['m3_prod'] * cooling_fixed / 100, 2)
-        lin_tot += self.daily_res['m3_q6'] + self.daily_res['m3_q7'] + self.daily_res['m3_peak']
+        lin_tot += round(self.daily_res['m3_q6'] + self.daily_res['m3_q7'] + self.daily_res['m3_peak'], 2)
 
         # 保存数据
         self.daily_res['lin_tot'] = round(lin_tot, 2)

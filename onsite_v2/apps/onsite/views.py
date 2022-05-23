@@ -449,17 +449,12 @@ class FillMonthlyCalculate(APIView):
         if jobs.check('ONSITE_FILLING_MONTHLY'):
             return Response('任务正在进行中，请稍后刷新', status=status.HTTP_400_BAD_REQUEST)
 
-        # 检查日期是否在21号之后，并设置日期
-        if datetime.today().day < 21:
-            jobs.update('ONSITE_FILLING_MONTHLY', 'ERROR: RequestTooEarly')
-            return Response('请在21号或以后生成数据', status=status.HTTP_400_BAD_REQUEST)
-
         # 设置时间
         try:
-            day = int(start.split('-')[-1])
+            # day = int(start.split('-')[-1])
             month = datetime.today().month
             year = datetime.today().year
-            self.end = datetime(year, month, day)
+            self.end = datetime(year, month, 21)
             self.start = self.end + relativedelta(months=-1)
         except Exception:
             jobs.update('ONSITE_FILLING_MONTHLY', 'ERROR: QueryDateSetError')
@@ -539,11 +534,6 @@ class InvoiceDiffCalculate(APIView):
         # 检查Job状态
         if jobs.check('ONSITE_INVOICE_DIFF'):
             return Response('任务正在进行中，请稍后刷新', status=status.HTTP_400_BAD_REQUEST)
-
-        # 检查日期是否在21号之后，并设置日期
-        if datetime.today().day < 21:
-            jobs.update('ONSITE_FILLING_MONTHLY', 'ERROR: RequestTooEarly')
-            return Response('请在21号或以后生成数据', status=status.HTTP_400_BAD_REQUEST)
 
         # 设置时间
         try:
@@ -933,6 +923,12 @@ class DailyModModelView(RetrieveUpdateViewSet):
     pagination_class = PageNum
     # 权限
     permission_classes = [IsAuthenticated]
+
+    # def update(self, request, pk):
+    #     daily_mod = DailyMod.objects.get(id=pk)
+    #
+    #     daily_mod.save()
+    #     return Response({'status': 200, 'msg': '修改DailyMod成功'})
 
 
 class MalfunctionModelView(ModelViewSet):

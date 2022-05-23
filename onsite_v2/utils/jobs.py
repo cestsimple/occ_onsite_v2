@@ -1,5 +1,5 @@
 from apps.iot.models import AsyncJob
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def check(name, silent: bool = False):
@@ -22,5 +22,7 @@ def check(name, silent: bool = False):
 def update(name, result):
     job = AsyncJob.objects.filter(name=name).order_by('-start_time')[0]
     job.finish_time = datetime.now()
+    if job.finish_time > job.start_time + timedelta(seconds=(60*20-5)):
+        result = 'TIMEOUT'
     job.result = result
     job.save()

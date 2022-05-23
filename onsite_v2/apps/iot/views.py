@@ -563,41 +563,61 @@ class RecordData(View):
                 print(f"asset_id={asset.id},is_apsa={asset.is_apsa}")
         print(f"有{total_apsa}个apsa和{total_bulk}个bulk,共:{len(self.variables)}个变量,预计{total_record}条记录")
         # 分发任务至子线程
-        multi_thread_task(multi_num=4, target_task=self.refresh_sub, task_args=(self.variables, h))
+        multi_thread_task(multi_num=5, target_task=self.refresh_sub, task_args=(self.variables, h))
         # 更新job状态
         jobs.update('IOT_RECORD', 'OK')
 
     def refresh_sub(self, variables, h):
         # 设置超时时间
-        time_now: int = int(time.time())
-        max_duration: int = 60 * 30  # secs
+        time_now = time.time()
+        max_duration = 60 * 20  # secs
+
         # 设置重试列表
+        error = 0
         retry_record = {}
         variables_list = [x for x in variables]
+        ori_len = len(variables_list)
+
+        # 设定查询时间
+        t = datetime.now()
+
+        # IOT系统时间未UTC，会把我们的时间+8返回
+        t_end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T17:00:00.000Z'
+        t_start = (t + timedelta(days=-2)).strftime("%Y-%m-%d") + 'T15:00:00.000Z'
+        max_num = 50000
+
+        # 设定daily_mark_list
+        daily_mark_list = [
+            'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
+            'H_STPDFT', 'H_STP400V', 'M3_PEAK',
+        ]
+
+        # 创建子线程job以便监控
+        job = AsyncJob.objects.create(
+            name=f'IOT_RECORD_{threading.get_ident()}',
+            start_time=datetime.now(),
+            result='starting,e'
+        )
+
+        # 循环任务
         while len(variables_list) != 0 and (time.time() - time_now < max_duration):
             length = len(variables_list)
             variable = variables_list[0]
-            # 设定查询时间
-            t = datetime.now()
-            # IOT系统时间未UTC，会把我们的时间+8返回
-            t_end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T17:00:00.000Z'
-            t_start = (t + timedelta(days=-2)).strftime("%Y-%m-%d") + 'T15:00:00.000Z'
-            max_num = 50000
             url = f'{URL}/assets/{variable.asset.uuid}/variables/{variable.uuid}/' \
                   f'timeseries?start={t_start}&end={t_end}&limit={max_num}'
+            # 删除此变量，若报错则重新添加
+            variables_list.remove(variable)
+            # 获取数据
             try:
-                res = requests.get(url, headers=h)
+                res = requests.get(url, headers=h, timeout=5)
                 if res.status_code == 401:
                     return
                 if res.status_code == 403:
                     pass
                 else:
                     res = res.json()['timeseries']
-                    daily_mark_list = [
-                        'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
-                        'H_STPDFT', 'H_STP400V', 'M3_PEAK',
-                    ]
                     for i in res.keys():
+                        # 时间转化
                         time_array = time.localtime(int(i[:-3]))
                         t = time.strftime("%Y-%m-%d %H:%M", time_array)
                         # 过滤
@@ -616,16 +636,30 @@ class RecordData(View):
                                     'value': round(value, 2)
                                 }
                             )
-                variables_list.remove(variable)
-            except Exception:
-                variables_list.remove(variable)
+                    second_part = job.result.split(",")[1]
+                    job.result = f'done:{ori_len-length}/{ori_len},' + second_part
+                    job.save()
+            except Exception as e:
+                print(e)
+                error += 1
+                # 错误时，若是第一次则创建计数器，否则计数器+1
                 if variable.id in retry_record.keys():
                     retry_record[variable.id] += 1
                 else:
                     retry_record[variable.id] = 0
-                if retry_record[variable.id] < 20:
+                # 最多尝试10次
+                if retry_record[variable.id] < 10:
                     variables_list.insert(length, variable)
-                    print(f'redo: {variable.id}')
+
+                first_part = job.result.split(",")[0]
+                job.result = first_part + f',retries:{error}'
+                job.save()
+
+        # 任务结束,判断结束条件
+        if len(variables_list) != 0:
+            job.result = 'Error:TimeOut,' + job.result
+        job.finish_time = datetime.now()
+        job.save()
 
     def partially_filter(self):
         # 获取所有传入apsa的id
@@ -1049,7 +1083,7 @@ class AddOriginDataView(View):
 
 class AsyncJobModelView(ModelViewSet):
     """返回任务"""
-    queryset = AsyncJob.objects.all()
+    queryset = AsyncJob.objects.order_by('-start_time')
     # 序列化器
     serializer_class = AsyncJobSerializer
     # 权限

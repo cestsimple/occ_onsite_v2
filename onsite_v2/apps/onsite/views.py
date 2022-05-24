@@ -934,8 +934,8 @@ class DailyModModelView(RetrieveUpdateViewSet):
 
 class MalfunctionModelView(ModelViewSet):
     # 查询集
-    queryset = Malfunction.objects.all().order_by('apsa__asset__site__engineer__region', 'apsa__onsite_series',
-                                                  't_start')
+    queryset = Malfunction.objects.order_by('confirm', 'apsa__asset__site__engineer__region', 'apsa__onsite_series',
+                                                  't_start',)
     # 序列化器
     serializer_class = MalfunctionSerializer
     # 指定分页器

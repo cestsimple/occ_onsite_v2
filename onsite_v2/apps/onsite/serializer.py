@@ -58,7 +58,7 @@ class MalfunctionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Malfunction
-        exclude = ['apsa', 'confirm']
+        exclude = ['apsa']
         extra_kwargs = {
             'reason_main': {'allow_blank': True},
             'reason_l1': {'allow_blank': True},

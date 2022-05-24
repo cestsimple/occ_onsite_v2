@@ -704,7 +704,8 @@ class FillingModelView(ModelViewSet):
             t = filling.time_1.strftime('%Y-%m-%d')
         bulk = filling.bulk
         site = Site.objects.get(asset__bulk=bulk)
-        apsa = Apsa.objects.get(asset__site=site, asset__is_apsa=1)
+        # 有可能有两台apsa
+        apsa = Apsa.objects.get(asset__rtu_name=bulk.asset.rtu_name, asset__is_apsa=1, asset__confirm=1)
         try:
             daily = Daily.objects.get(apsa=apsa, date=t)
         except Exception:

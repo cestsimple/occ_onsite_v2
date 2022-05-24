@@ -563,7 +563,7 @@ class RecordData(View):
                 print(f"asset_id={asset.id},is_apsa={asset.is_apsa}")
         print(f"有{total_apsa}个apsa和{total_bulk}个bulk,共:{len(self.variables)}个变量,预计{total_record}条记录")
         # 分发任务至子线程
-        multi_thread_task(multi_num=5, target_task=self.refresh_sub, task_args=(self.variables, h))
+        multi_thread_task(multi_num=8, target_task=self.refresh_sub, task_args=(self.variables, h))
         # 更新job状态
         jobs.update('IOT_RECORD', 'OK')
 
@@ -594,7 +594,7 @@ class RecordData(View):
 
         # 创建子线程job以便监控
         job = AsyncJob.objects.create(
-            name=f'IOT_RECORD_{threading.get_ident()}',
+            name=f'SUB_RECORD_{threading.get_ident()}',
             start_time=datetime.now(),
             result='starting,e'
         )
@@ -658,8 +658,10 @@ class RecordData(View):
         # 任务结束,判断结束条件
         if len(variables_list) != 0:
             job.result = 'Error:TimeOut,' + job.result
-        job.finish_time = datetime.now()
-        job.save()
+            job.finish_time = datetime.now()
+            job.save()
+        else:
+            job.delete()
 
     def partially_filter(self):
         # 获取所有传入apsa的id
@@ -979,9 +981,7 @@ class AssetModelView(UpdateListRetrieveViewSet):
             asset.comment = comment
         site = Site.objects.get(id=site_dic['id'])
         site.engineer = User.objects.get(id=site_dic['engineer']['id'])
-        for a in Asset.objects.filter(site=site):
-            a.rtu_name = rtu_name
-            a.save()
+        asset.rtu_name = rtu_name
         asset.confirm = confirm
         try:
             if bulk_dic:

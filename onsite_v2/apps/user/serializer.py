@@ -1,15 +1,20 @@
+from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
-from .models import User, Role, Permission, RolePermission
+from .models import User, Role, Permission, RolePermission, UserRole
 
 
 class UserSerializer(ModelSerializer):
     """
         User序列化器
     """
+    roles = serializers.SerializerMethodField()
+
+    def get_roles(self, obj):
+        return [x.role_id for x in UserRole.objects.filter(user=obj)]
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'is_staff', 'level', 'region', 'group', 'password', 'email']
+        exclude = ['last_login', 'is_superuser', 'is_active']
 
         extra_kwargs = {
             'username': {
@@ -48,4 +53,11 @@ class RolePermissionSerializer(ModelSerializer):
 
     class Meta:
         model = RolePermission
+        fields = '__all__'
+
+
+class UserRoleSerializer(ModelSerializer):
+
+    class Meta:
+        model = UserRole
         fields = '__all__'

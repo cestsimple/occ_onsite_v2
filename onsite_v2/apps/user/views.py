@@ -1,3 +1,5 @@
+import json
+
 from django.db import DatabaseError
 from django.db.models import Q
 from django.http import JsonResponse
@@ -5,10 +7,12 @@ from django.views import View
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from utils.pagination import PageNum
-from .models import User, Role, Permission, RolePermission
-from .serializer import UserSerializer, RoleSerializer, PermissionSerializer, RolePermissionSerializer
+from .models import User, Role, Permission, RolePermission, UserRole
+from .serializer import UserSerializer, RoleSerializer, PermissionSerializer, RolePermissionSerializer, \
+    UserRoleSerializer
 
 
 class AdminCreateView(View):
@@ -143,3 +147,31 @@ class RolePermissionModelView(ModelViewSet):
                 )
 
         return Response({'status': 200, 'msg': '创建成功'})
+
+
+class UserAssignRole(APIView):
+    def put(self, request):
+        user_id = request.data.get('id')
+        role_ids = request.data.get('roleIds')
+        # 参数不能为空
+        if not role_ids:
+            return Response('参数错误', status=400)
+
+        # 获取当前用户的角色列表
+        user_role_list_old = [x.role_id for x in UserRole.objects.filter(user_id=user_id)]
+
+        # 对比更新后的列表
+        create_list = [x for x in role_ids if x not in user_role_list_old]
+        delete_list = [x for x in user_role_list_old if x not in role_ids]
+
+        # 创建用户角色
+        if create_list:
+            for r_id in create_list:
+                UserRole.objects.create(role_id=r_id, user_id=user_id)
+
+        # 删除用户角色
+        if delete_list:
+            for r_id in delete_list:
+                UserRole.objects.get(role_id=r_id, user_id=user_id).delete()
+
+        return Response('保存成功', status=200)

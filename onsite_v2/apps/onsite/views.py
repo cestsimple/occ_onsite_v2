@@ -232,7 +232,8 @@ class DailyCalculate(View):
                 # 单机apsa计算
                 self.get_lin_tot_simple()
             else:
-                if d_res['m3_prod'] >= -0.99 and d_res['m3_q6'] >= -0.99 and d_res['m3_q7'] >= -0.99 and d_res['m3_peak'] >= -0.99:
+                if d_res['m3_prod'] >= -0.99 and d_res['m3_q6'] >= -0.99 and d_res['m3_q7'] >= -0.99 and d_res[
+                    'm3_peak'] >= -0.99:
                     # 共用apsa计算(该机器固定补冷)
                     self.get_lin_tot_complex()
                 else:
@@ -935,7 +936,7 @@ class DailyModModelView(RetrieveUpdateViewSet):
 class MalfunctionModelView(ModelViewSet):
     # 查询集
     queryset = Malfunction.objects.order_by('confirm', 'apsa__asset__site__engineer__region', 'apsa__onsite_series',
-                                                  't_start',)
+                                            't_start', )
     # 序列化器
     serializer_class = MalfunctionSerializer
     # 指定分页器
@@ -950,6 +951,7 @@ class MalfunctionModelView(ModelViewSet):
         end = querry.get('end')
         name = querry.get('name')
         region = querry.get('region')
+        reason = querry.getlist('reason[]')
         group = querry.get('group')
 
         if region:
@@ -961,6 +963,9 @@ class MalfunctionModelView(ModelViewSet):
             self.queryset = self.queryset.filter(
                 Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
             )
+        if reason is not None and isinstance(reason, list) and reason != []:
+            self.queryset = self.queryset.filter(reason_main__in=reason)
+
         if start and end:
             start = start.replace('+', '')
             end = end.replace('+', '')

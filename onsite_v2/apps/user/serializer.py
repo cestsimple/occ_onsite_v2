@@ -52,6 +52,12 @@ class PermissionSerializer(ModelSerializer):
         model = Permission
         fields = '__all__'
 
+        extra_kwargs = {
+            'description': {
+                'allow_blank': True
+            }
+        }
+
 
 class RolePermissionSerializer(ModelSerializer):
     permission = PermissionSerializer()

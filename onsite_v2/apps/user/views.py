@@ -86,6 +86,20 @@ class UserView(ModelViewSet):
 
         return Response({'status': 200, 'msg': '保存成功'})
 
+    def destroy(self, request, *args, **kwargs):
+        try:
+            user = self.get_object()
+            user_roles = UserRole.objects.filter(user=user)
+            # 删除用户角色
+            for x in user_roles:
+                x.delete()
+            # 删除用户
+            user.delete()
+        except Exception as e:
+            print(e)
+            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
+        return Response({'status': 200, 'msg': '删除用户成功'})
+
 
 class RoleModelView(ModelViewSet):
     # 查询集
@@ -97,6 +111,24 @@ class RoleModelView(ModelViewSet):
     # 权限
     permission_classes = [IsAuthenticated]
 
+    def destroy(self, request, *args, **kwargs):
+        try:
+            role = self.get_object()
+            user_roles = UserRole.objects.filter(role=role)
+            role_permissions = RolePermission.objects.filter(role=role)
+            # 删除用户角色
+            for x in user_roles:
+                x.delete()
+            # 删除角色权限
+            for j in role_permissions:
+                j.delete()
+            # 删除角色
+            role.delete()
+        except Exception as e:
+            print(e)
+            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
+        return Response({'status': 200, 'msg': '删除角色成功'})
+
 
 class PermissionModelView(ModelViewSet):
     # 查询集
@@ -107,6 +139,20 @@ class PermissionModelView(ModelViewSet):
     pagination_class = PageNum
     # 权限
     permission_classes = [IsAuthenticated]
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            permission = self.get_object()
+            role_permissions = RolePermission.objects.filter(permission=permission)
+            # 删除角色权限
+            for x in role_permissions:
+                x.delete()
+            # 删除权限
+            permission.delete()
+        except Exception as e:
+            print(e)
+            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
+        return Response({'status': 200, 'msg': '删除权限成功'})
 
 
 class RolePermissionModelView(ModelViewSet):

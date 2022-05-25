@@ -54,10 +54,3 @@ class RolePermissionSerializer(ModelSerializer):
     class Meta:
         model = RolePermission
         fields = '__all__'
-
-
-class UserRoleSerializer(ModelSerializer):
-
-    class Meta:
-        model = UserRole
-        fields = '__all__'

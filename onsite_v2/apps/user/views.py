@@ -11,8 +11,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from utils.pagination import PageNum
 from .models import User, Role, Permission, RolePermission, UserRole
-from .serializer import UserSerializer, RoleSerializer, PermissionSerializer, RolePermissionSerializer, \
-    UserRoleSerializer
+from .serializer import UserSerializer, RoleSerializer, PermissionSerializer, RolePermissionSerializer
 
 
 class AdminCreateView(View):

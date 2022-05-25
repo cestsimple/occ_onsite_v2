@@ -37,6 +37,11 @@ class UserSerializer(ModelSerializer):
 
 
 class RoleSerializer(ModelSerializer):
+    permIds = serializers.SerializerMethodField()
+
+    def get_permIds(self, obj):
+        return [x.permission_id for x in RolePermission.objects.filter(role=obj)]
+
     class Meta:
         model = Role
         fields = '__all__'

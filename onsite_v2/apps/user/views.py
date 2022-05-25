@@ -220,3 +220,32 @@ class UserAssignRole(APIView):
                 UserRole.objects.get(role_id=r_id, user_id=user_id).delete()
 
         return Response('保存成功', status=200)
+
+
+class RoleAssignPerm(APIView):
+    def put(self, request):
+        role_id = request.data.get('id')
+        perm_ids = request.data.get('permIds')
+
+        # 参数不能为空
+        if perm_ids is None:
+            return Response('参数错误', status=400)
+
+        # 获取当前角色的权限列表
+        role_perm_list_old = [x.permission_id for x in RolePermission.objects.filter(role_id=role_id)]
+
+        # 对比更新后的列表
+        create_list = [x for x in perm_ids if x not in role_perm_list_old]
+        delete_list = [x for x in role_perm_list_old if x not in perm_ids]
+
+        # 创建角色权限
+        if create_list:
+            for p_id in create_list:
+                RolePermission.objects.create(permission_id=p_id, role_id=role_id)
+
+        # 删除角色权限
+        if delete_list:
+            for p_id in delete_list:
+                RolePermission.objects.get(permission_id=p_id, role_id=role_id).delete()
+
+        return Response('保存成功', status=200)

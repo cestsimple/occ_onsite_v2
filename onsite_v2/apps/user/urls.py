@@ -27,5 +27,8 @@ urlpatterns = [
         views.RolePermissionModelView.as_view({'get': 'retrieve', 'delete': 'destroy'})),
 
     # 用户角色管理
-    url(r'^user/role/assign/$', views.UserAssignRole.as_view())
+    url(r'^user/assignRole/$', views.UserAssignRole.as_view()),
+
+    # 角色权限管理
+    url(r'^user/role/assignPrem/$', views.RoleAssignPerm.as_view()),
 ]

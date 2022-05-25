@@ -41,6 +41,7 @@ class MalfunctionSerializer(serializers.ModelSerializer):
     rtu_name = serializers.SerializerMethodField()
     avg_con = serializers.SerializerMethodField()
     facility_fin = serializers.SerializerMethodField()
+    region = serializers.SerializerMethodField()
 
     def get_asset_name(self, obj):
         return Asset.objects.get(apsa=obj.apsa).name
@@ -55,6 +56,9 @@ class MalfunctionSerializer(serializers.ModelSerializer):
 
     def get_facility_fin(self, obj):
         return obj.apsa.facility_fin
+
+    def get_region(self, obj):
+        return obj.apsa.asset.site.engineer.region
 
     class Meta:
         model = Malfunction

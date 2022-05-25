@@ -1046,7 +1046,7 @@ class ReasonModelView(ListViewSet):
                 # 序列化一级原因
                 reason_list = []
                 for reason in reason_level_1:
-                    reason_list.append({'id': reason.id, 'cname': reason.cname})
+                    reason_list.append({'id': reason.id, 'cname': reason.cname, 'ename': reason.ename})
             except Exception as e:
                 print(e)
                 return JsonResponse({'code': 400, 'errmsg': '一级原因数据错误'})
@@ -1061,7 +1061,7 @@ class ReasonModelView(ListViewSet):
                 # 序列化下级原因数据
                 sub_list = []
                 for sub_model in sub_model_list:
-                    sub_list.append({'id': sub_model.id, 'cname': sub_model.cname})
+                    sub_list.append({'id': sub_model.id, 'cname': sub_model.cname, 'ename': sub_model.ename})
 
                 sub_data = {
                     'id': parent_model.id,  # 父级pk

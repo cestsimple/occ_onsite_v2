@@ -505,10 +505,14 @@ class RecordData(View):
         self.variables = []
         self.assets = []
         self.apsa_list: list[int] = []
+        self.time_list: list[str] = []
+        self.start = ''
+        self.end = ''
 
     def get(self, request):
         # 获取部分刷新列表
         self.apsa_list = request.GET.getlist('apsa_list[]', [])
+        self.time_list = request.GET.getlist('time_list[]', [])
 
         # 检查Job状态
         if jobs.check('IOT_RECORD'):
@@ -579,12 +583,7 @@ class RecordData(View):
         ori_len = len(variables_list)
 
         # 设定查询时间
-        t = datetime.now()
-
-        # IOT系统时间未UTC，会把我们的时间+8返回
-        t_end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T17:00:00.000Z'
-        t_start = (t + timedelta(days=-2)).strftime("%Y-%m-%d") + 'T15:00:00.000Z'
-        max_num = 50000
+        self.set_time()
 
         # 设定daily_mark_list
         daily_mark_list = [
@@ -604,7 +603,7 @@ class RecordData(View):
             length = len(variables_list)
             variable = variables_list[0]
             url = f'{URL}/assets/{variable.asset.uuid}/variables/{variable.uuid}/' \
-                  f'timeseries?start={t_start}&end={t_end}&limit={max_num}'
+                  f'timeseries?start={self.start}&end={self.end}&limit={50000}'
             # 删除此变量，若报错则重新添加
             variables_list.remove(variable)
             # 获取数据
@@ -637,7 +636,7 @@ class RecordData(View):
                                 }
                             )
                     second_part = job.result.split(",")[1]
-                    job.result = f'done:{ori_len-length}/{ori_len},' + second_part
+                    job.result = f'done:{ori_len - length}/{ori_len},' + second_part
                     job.save()
             except Exception as e:
                 print(e)
@@ -662,6 +661,17 @@ class RecordData(View):
             job.save()
         else:
             job.delete()
+
+    def set_time(self):
+        if self.time_list == [] or self.time_list is None:
+            # 设定默认查询时间
+            t = datetime.now()
+            # IOT系统时间未UTC，会把我们的时间+8返回
+            self.start = (t + timedelta(days=-2)).strftime("%Y-%m-%d") + 'T15:00:00.000Z'
+            self.end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T17:00:00.000Z'
+        else:
+            self.start = self.time_list[0] + 'T15:00:00.000Z'
+            self.end = self.time_list[1] + 'T17:00:00.000Z'
 
     def partially_filter(self):
         # 获取所有传入apsa的id

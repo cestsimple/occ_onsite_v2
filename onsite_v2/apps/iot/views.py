@@ -987,7 +987,7 @@ class AssetModelView(UpdateListRetrieveViewSet):
                 return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)
 
         # 保存asset和site
-        if comment:
+        if comment is not None:
             asset.comment = comment
         site = Site.objects.get(id=site_dic['id'])
         site.engineer = User.objects.get(id=site_dic['engineer']['id'])

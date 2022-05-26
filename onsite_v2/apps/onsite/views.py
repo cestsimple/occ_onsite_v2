@@ -1127,7 +1127,7 @@ class ReasonDetailModelView(ListViewSet):
 
 class MonthlyVariableModelView(ModelViewSet):
     # 查询集
-    queryset = MonthlyVariable.objects.order_by('apsa__asset__site__engineer_region')
+    queryset = MonthlyVariable.objects.order_by('apsa__asset__site__engineer_region', 'apsa__asset__rtu_name', 'variable')
     # 序列化器
     serializer_class = InvoiceVariableSerializer
     # 指定分页器
@@ -1181,6 +1181,39 @@ class MonthlyVariableModelView(ModelViewSet):
             return Response("内部错误", status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'status': 200, 'msg': 'ok'})
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            record = self.get_object()
+            for x in MonthlyVariable.objects.filter(variable=record.variable):
+                x.delete()
+        except Exception as e:
+            print(e)
+            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
+        return Response({'status': 200, 'msg': '删除权限成功'})
+
+    def list(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            res = self.aggregate(serializer.data)
+            return self.get_paginated_response(res)
+
+        serializer = self.get_serializer(queryset, many=True)
+        res = self.aggregate(serializer.data)
+        return Response(res)
+
+    def aggregate(self, data_list):
+        res = {}
+        for data in data_list:
+            key = f"{data['apsa']}+{data['variable']}"
+            if key in res.keys():
+                res[key]['usage'].append(data['usage'])
+            else:
+                data['usage'] = [data['usage']]
+                res[key] = data
+        return [res[x] for x in res.keys()]
 
 
 class InvoiceDiffModelView(ModelViewSet):

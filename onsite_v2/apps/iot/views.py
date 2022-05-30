@@ -151,11 +151,7 @@ class SiteData(View):
         # 删除site
         list_delete = []
         for delete_site in site_delete_uuid:
-            site = Site.objects.get(uuid=delete_site)
-            if site.confirm != -1:
-                list_delete.append(site)
-                site.confirm = -1
-                site.save()
+            site = Site.objects.get(uuid=delete_site).delete()
 
         # 批量写入数据库
         try:
@@ -247,11 +243,7 @@ class AssetData(View):
         # 删除
         list_delete = []
         for delete_asset in asset_delete_uuid:
-            asset = Asset.objects.get(uuid=delete_asset)
-            if asset.confirm != -1:
-                list_delete.append(asset)
-                asset.confirm = -1
-                asset.save()
+            asset = Asset.objects.get(uuid=delete_asset).delete()
 
         # 批量写入数据库
         try:
@@ -466,13 +458,7 @@ class VariableData(View):
 
             # 删除变量
             for variable_delete in variable_delete_uuid:
-                v = Variable.objects.get(uuid=variable_delete)
-                if v.confirm != -1:
-                    v.daily_mark = ''
-                    v.confirm = -1
-                    v.save()
-                    # 删除变量记录
-                    Record.objects.filter(variable=v).delete()
+                v = Variable.objects.get(uuid=variable_delete).delete()
 
     def get_daily_mark(self, name, asset_name):
         # Daily标志列表

@@ -1097,6 +1097,13 @@ class ReasonModelView(ListViewSet):
     def list(self, request):
         query = request.query_params
         parent = query.get('parent')
+        all = query.get('all')
+
+        if all:
+            reason_list = []
+            for reason in Reason.objects.all():
+                reason_list.append({'id': reason.id, 'cname': reason.cname, 'ename': reason.ename})
+            return JsonResponse({'code': 200, 'errmsg': 'OK', 'reason_list': reason_list})
 
         if not parent:
             try:

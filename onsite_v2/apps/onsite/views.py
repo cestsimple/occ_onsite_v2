@@ -401,7 +401,7 @@ class DailyCalculate(View):
             elif d_res['h_stpdft']:
                 default = {
                     'stop_label': 'DFT',
-                    'stop_consumption': 0,
+                    'stop_consumption': d_res['m3_q6'],
                     'stop_hour': d_res['h_stpdft'],
                 }
             elif d_res['h_stp400v']:
@@ -1197,25 +1197,23 @@ class MonthlyVariableModelView(ModelViewSet):
 
     def get_queryset(self):
         # 条件过滤功能
-        querry = self.request.query_params
-        name = querry.get('name')
-        usage = querry.get('usage')
-        region = querry.get('region')
-        group = querry.get('group')
+        query = self.request.query_params
+        name = query.get('name')
+        usage = query.get('usage')
+        region = query.get('region')
 
+        queryset = self.queryset
         if region:
-            self.queryset = self.queryset.filter(apsa__asset__site__engineer__region=region)
-        if group:
-            self.queryset = self.queryset.filter(apsa__asset__site__engineer__group=group)
+            queryset = queryset.filter(apsa__asset__site__engineer__region=region)
         if name:
             name = name.strip().upper()
-            self.queryset = self.queryset.filter(
+            queryset = queryset.filter(
                 Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
             )
         if usage:
-            self.queryset = self.queryset.filter(usage=usage.upper())
+            queryset = queryset.filter(usage=usage.upper())
 
-        return self.queryset
+        return queryset
 
     def create(self, request, *args, **kwargs):
         try:

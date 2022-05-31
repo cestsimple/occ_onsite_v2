@@ -8,13 +8,26 @@ class UserSerializer(ModelSerializer):
         User序列化器
     """
     roles = serializers.SerializerMethodField()
+    perms = serializers.SerializerMethodField()
 
     def get_roles(self, obj):
         return [x.role_id for x in UserRole.objects.filter(user=obj)]
 
+    def get_perms(self, obj):
+        menus = []
+        points = []
+        role_ids = [x.role_id for x in UserRole.objects.filter(user=obj)]
+        for perm in Permission.objects.filter(rolepermission__role__in=role_ids).distinct():
+            if perm.parent is None:
+                menus.append(perm.code)
+            else:
+                points.append(perm.code)
+        return {'menus': menus, 'points': points}
+
     class Meta:
         model = User
-        exclude = ['last_login', 'is_superuser', 'is_active']
+        exclude = ['last_login', 'is_superuser', 'is_active', 'groups', 'user_permissions', 'is_staff', 'level',
+                   'date_joined']
 
         extra_kwargs = {
             'username': {

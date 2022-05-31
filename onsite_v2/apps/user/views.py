@@ -76,9 +76,9 @@ class UserView(ModelViewSet):
             user.region = region
             user.group = group
             user.email = email
-            user.save()
-            if password != '' and password:
+            if password != '' and password is not None:
                 user.set_password(password.strip())
+            user.save()
         except DatabaseError as e:
             print(e)
             return Response('数据库查询错误', status=status.HTTP_400_BAD_REQUEST)

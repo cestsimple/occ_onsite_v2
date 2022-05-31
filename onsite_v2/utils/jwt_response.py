@@ -6,5 +6,4 @@ def jwt_response_payload_handler(token, user=None, request=None):
         'token': 'JWT ' + token,
         'id': user.id,
         'username': user.username,
-        'level': user.level,
     }

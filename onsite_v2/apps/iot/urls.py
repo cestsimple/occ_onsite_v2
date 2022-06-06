@@ -8,6 +8,7 @@ urlpatterns = [
     url(r'^iot/tag/$', views.TagData.as_view()),
     url(r'^iot/variable/$', views.VariableData.as_view()),
     url(r'^iot/record/$', views.RecordData.as_view()),
+    url(r'^iot/record/kill/$', views.KillRecordTaskView.as_view()),
     url(r'^iot/all/$', views.RefreshAllAsset.as_view()),
 
     # 查询site修改数据

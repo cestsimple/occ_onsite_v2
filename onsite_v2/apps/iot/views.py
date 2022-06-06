@@ -560,7 +560,7 @@ class RecordData(View):
     def refresh_sub(self, variables, h):
         # 设置超时时间
         time_now = time.time()
-        max_duration = 60 * 20  # secs
+        max_duration = 60 * 10  # secs
 
         # 设置重试列表
         error = 0
@@ -1171,3 +1171,13 @@ class RefreshAllAsset(APIView):
             time.sleep(5)
         # 刷新超时，计入失败
         jobs.update('IOT_ALL', 'ERROR: TIME OUT')
+
+
+class KillRecordTaskView(View):
+    def get(self, request):
+        jobs = AsyncJob.objects.filter(name__contains='RECORD', finish_time=None)
+        for job in jobs:
+            job.result = 'ERROR: killed by api request'
+            job.finish_time = datetime.now()
+            job.save()
+        return JsonResponse({"status": 200, 'msg': 'ok'})

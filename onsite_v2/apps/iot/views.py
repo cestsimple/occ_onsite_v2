@@ -1180,4 +1180,4 @@ class KillRecordTaskView(View):
             job.result = 'ERROR: killed by api request'
             job.finish_time = datetime.now()
             job.save()
-        return JsonResponse({"status": 200, 'msg': 'ok'})
+        return JsonResponse({"status": 200, 'msg': 'ok', 'affected rows': len(jobs)})

@@ -100,6 +100,21 @@ class UserView(ModelViewSet):
         return Response({'status': 200, 'msg': '删除用户成功'})
 
 
+class UserSetPassword(APIView):
+    def put(self, request):
+        user_id = request.data.get('id')
+        password = request.data.get('password')
+
+        try:
+            user = User.objects.get(id=user_id)
+            user.set_password(password.strip())
+            user.save()
+        except Exception:
+            return Response('数据库错误', status=400)
+
+        return Response({'status': 200, 'msg': '修改成功'})
+
+
 class RoleModelView(ModelViewSet):
     # 查询集
     queryset = Role.objects.all()

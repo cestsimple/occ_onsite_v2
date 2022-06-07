@@ -11,6 +11,9 @@ urlpatterns = [
     url(r'^user/$', views.UserView.as_view({'get': 'list', 'post': 'create'})),
     url(r'^user/(?P<pk>\d+)/$', views.UserView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 
+    # 修改密码
+    url(r'^user/password/', views.UserSetPassword.as_view()),
+
     # 角色管理
     url(r'^user/role/$', views.RoleModelView.as_view({'get': 'list', 'post': 'create'})),
     url(r'^user/role/(?P<pk>\d+)/$',

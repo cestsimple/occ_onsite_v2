@@ -1222,6 +1222,31 @@ class MonthlyVariableModelView(ModelViewSet):
 
         return queryset
 
+    def update(self, request):
+        # 获取参数
+        variable_id: int = request.data.get('variable')
+        apsa_id = request.data.get('apsa')
+        usage: list[str] = request.data.get('usage')
+
+        old_usage = [x.usage for x in MonthlyVariable.objects.filter(variable=variable_id)]
+
+        delete_item = [x for x in old_usage if x not in usage]
+        create_item = [x for x in usage if x not in old_usage]
+
+        variable = Variable.objects.get(id=variable_id)
+        apsa = Apsa.objects.get(id=apsa_id)
+        # 保存数据
+        try:
+            for usage in delete_item:
+                MonthlyVariable.objects.get(variable=variable_id, usage=usage).delete()
+
+            for usage in create_item:
+                MonthlyVariable.objects.create(variable=variable, apsa=apsa, usage=usage)
+        except DatabaseError as e:
+            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'status': 200, 'msg': '修改月报变量成功'})
+
     def create(self, request, *args, **kwargs):
         try:
             apsa: int = request.data.get('apsa')

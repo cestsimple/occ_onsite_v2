@@ -37,9 +37,9 @@ urlpatterns = [
     url(r'^malfunction/reason/detail/$', views.ReasonDetailModelView.as_view({'get': 'list'})),
 
     # monthly variable
-    url(r'^monthly/variable/$', views.MonthlyVariableModelView.as_view({'get': 'list', 'post': 'create'})),
+    url(r'^monthly/variable/$', views.MonthlyVariableModelView.as_view({'get': 'list', 'put': 'update', 'post': 'create'})),
     url(r'^monthly/variable/(?P<pk>\d+)/$',
-        views.MonthlyVariableModelView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
+        views.MonthlyVariableModelView.as_view({'get': 'retrieve',  'delete': 'destroy'})),
 
     # invoice variable diff
     url(r'^monthly/variable/diff/$', views.InvoiceDiffModelView.as_view({'get': 'list'})),

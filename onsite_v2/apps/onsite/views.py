@@ -219,7 +219,8 @@ class DailyCalculate(View):
         for date in self.date_list:
             # 设置起始日期
             self.set_time(date)
-            print(1)
+
+            # 计算每个apsa
             for apsa in apsas:
                 # 传递apsa全局使用
                 self.apsa = apsa
@@ -272,9 +273,8 @@ class DailyCalculate(View):
 
     def set_time(self, date):
         # 设置起始时间 eg.计算9号数据 应该设置查询8，9两天数据
-        date = datetime.strptime(date, '%Y-%m-%d')
-        self.t_start = (date + timedelta(days=-1)).strftime("%Y-%m-%d")
-        self.t_end = (date + timedelta(days=0)).strftime("%Y-%m-%d")
+        self.t_start = date
+        self.t_end = (datetime.strptime(date, '%Y-%m-%d') + timedelta(days=1)).strftime("%Y-%m-%d")
 
     def get_daily_res(self):
         # 对于每个需要计算的variable

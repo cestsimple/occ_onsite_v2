@@ -123,7 +123,7 @@ class SiteData(View):
         sites_iot_dic = {}
         for content in contents:
             sites_iot_dic[content['id']] = content
-        sites_db_uuid = [x.uuid for x in Site.objects.all()]
+        sites_db_uuid = [x.uuid for x in Site.objects.filter(confirm__gt=-1)]
 
         site_new_uuid = [j for j in sites_iot_dic.keys() if j not in sites_db_uuid]
         site_delete_uuid = [k for k in sites_db_uuid if k not in sites_iot_dic.keys()]
@@ -149,9 +149,10 @@ class SiteData(View):
             list_update.append(site)
 
         # 删除site
-        list_delete = []
         for delete_site in site_delete_uuid:
-            site = Site.objects.get(uuid=delete_site).delete()
+            site = Site.objects.get(uuid=delete_site)
+            site.confirm = -1
+            site.save()
 
         # 批量写入数据库
         try:
@@ -165,8 +166,7 @@ class SiteData(View):
         print(f"更新{len(list_update)}个site资产")
         for x in list_create:
             print(f"新建site资产: {x.name}")
-        for x in list_delete:
-            print(f"删除site资产: {x.name}")
+        print(f"删除site:{len(site_delete_uuid)}个")
 
         # 更新Job状态
         jobs.update('IOT_SITE', 'OK')
@@ -202,7 +202,7 @@ class AssetData(View):
         assets_iot_dic = {}
         for content in contents:
             assets_iot_dic[content['id']] = content
-        assets_db_uuid = [x.uuid for x in Asset.objects.all()]
+        assets_db_uuid = [x.uuid for x in Asset.objects.filter(confirm__gt=-1)]
 
         asset_new_uuid = [j for j in assets_iot_dic.keys() if j not in assets_db_uuid]
         asset_delete_uuid = [k for k in assets_db_uuid if k not in assets_iot_dic.keys()]
@@ -241,9 +241,10 @@ class AssetData(View):
             list_update.append(asset)
 
         # 删除
-        list_delete = []
         for delete_asset in asset_delete_uuid:
-            asset = Asset.objects.get(uuid=delete_asset).delete()
+            asset = Asset.objects.get(uuid=delete_asset)
+            asset.confirm = -1
+            asset.save()
 
         # 批量写入数据库
         try:
@@ -257,8 +258,7 @@ class AssetData(View):
         print(f"更新{len(list_update)}个asset资产")
         for x in list_create:
             print(f"新建asset资产: {x.name}")
-        for x in list_delete:
-            print(f"删除asset资产: {x.name}")
+        print(f"删除asset资产{len(asset_delete_uuid)}个")
 
         # 更新Job状态
         jobs.update('IOT_ASSET', 'OK')
@@ -434,7 +434,7 @@ class VariableData(View):
                 variable_iot_dic[content['id']] = content
 
             # 计算更新，删除列表
-            variable_old_uuid = [x.uuid for x in Variable.objects.filter(asset=asset)]
+            variable_old_uuid = [x.uuid for x in Variable.objects.filter(asset=asset, confirm__gt=-1)]
             variable_new_uuid = [j for j in variable_iot_dic.keys() if j not in variable_old_uuid]
             variable_delete_uuid = [k for k in variable_old_uuid if k not in variable_iot_dic.keys()]
             variable_update_uuid = [l for l in variable_old_uuid if l in variable_iot_dic.keys()]
@@ -458,7 +458,9 @@ class VariableData(View):
 
             # 删除变量
             for variable_delete in variable_delete_uuid:
-                v = Variable.objects.get(uuid=variable_delete).delete()
+                v = Variable.objects.get(uuid=variable_delete)
+                v.confirm = -1
+                v.save()
 
     def get_daily_mark(self, name, asset_name):
         # Daily标志列表
@@ -658,7 +660,7 @@ class RecordData(View):
             self.end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T17:00:00.000Z'
         else:
             self.start = self.time_list[0] + 'T15:00:00.000Z'
-            self.end = self.time_list[1] + 'T17:00:00.000Z'
+            self.end = (datetime.strptime(self.time_list[1], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")+ 'T17:00:00.000Z'
 
     def partially_filter(self):
         # 如果传入了apsa_id则过滤,否则跳过
@@ -678,7 +680,7 @@ class RecordData(View):
 class SiteModelView(UpdateListRetrieveViewSet):
     """自定义SiteMixinView"""
     # 查询集
-    queryset = Site.objects.filter(asset__tags='ONSITE').distinct()
+    queryset = Site.objects.filter(asset__tags='ONSITE', confirm__gt=-1).distinct()
     # 序列化器
     serializer_class = SiteSerializer
     # 权限
@@ -823,7 +825,7 @@ class BulkModelView(UpdateListRetrieveViewSet):
 class VariableModelView(UpdateListRetrieveViewSet):
     """自定义AssetMixinView"""
     # 查询集
-    queryset = Variable.objects.filter(asset__tags='ONSITE')
+    queryset = Variable.objects.filter(asset__tags='ONSITE', confirm__gt=-1)
     # 序列化器
     serializer_class = VariableSerializer
     # 权限

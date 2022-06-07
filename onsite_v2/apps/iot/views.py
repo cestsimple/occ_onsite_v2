@@ -516,6 +516,7 @@ class RecordData(View):
         h = get_cognito()
         # 遍历asset，获取确认过的再计算
         self.assets = Asset.objects.filter(confirm=1, tags='onsite')
+
         # 如果是部分请求，则过滤
         self.partially_filter()
 
@@ -660,17 +661,17 @@ class RecordData(View):
             self.end = self.time_list[1] + 'T17:00:00.000Z'
 
     def partially_filter(self):
-        # 获取所有传入apsa的id
-        apsa_id_list = [int(x) for x in self.apsa_list]
-        asset_id_list = []
-        # 找到每个apsa对应的site下的所有confirm=1的资产id
-        for apsa_id in apsa_id_list:
-            site_id = Asset.objects.get(apsa=apsa_id).site_id
-            asset_id_list += [
-                x.id for x in Asset.objects.filter(site=site_id, confirm=1)
-            ]
-        # 用上面的asset_id进行过滤
+        # 如果传入了apsa_id则过滤,否则跳过
         if self.apsa_list:
+            # 获取所有传入apsa的id
+            apsa_id_list = [int(x) for x in self.apsa_list]
+            asset_id_list = []
+            # 找到每个apsa对应的site下的所有confirm=1的资产id
+            for apsa_id in apsa_id_list:
+                site_id = Asset.objects.get(apsa=apsa_id).site_id
+                asset_id_list += [
+                    x.id for x in Asset.objects.filter(site=site_id, confirm=1)
+                ]
             self.assets = self.assets.filter(id__in=asset_id_list)
 
 

@@ -24,12 +24,13 @@ from utils.pagination import PageNum
 
 class FillingCalculate(View):
     def __init__(self):
-        self.start_date = ''
+        self.date_list = []
+        self.t_start = ''
+        self.t_end = ''
 
     def get(self, request):
         # 获取filling日期参数
-        query_params = request.GET
-        self.start_date = query_params.get('start')
+        self.date_list = request.GET.getlist('date_list[]', [])
 
         # 检查Job状态
         if jobs.check('ONSITE_FILLING'):
@@ -43,17 +44,16 @@ class FillingCalculate(View):
 
     def calculate_main(self):
         # 设置起始时间
-        if not self.start_date:
-            self.start_date = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d") + ' 00:00'
-        t_start = self.start_date
-        t_end = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d") + ' 23:59'
+        self.set_date()
 
         # 获取所有需要计算的bulk的variable
         variables = Variable.objects.filter(asset__bulk__filling_js__gte=1, daily_mark='LEVEL')
 
+        # 对每个储罐进行计算
         for variable in variables:
             records = {}
-            data = Record.objects.filter(variable=variable).filter(time__range=[t_start, t_end]).order_by('time')
+            data = Record.objects.filter(variable=variable).filter(time__range=[self.t_start, self.t_end]).order_by(
+                'time')
             # 对数据按照时间再次排序
             for row in data:
                 time_str = row.time.strftime("%Y-%m-%d %H:%M")
@@ -152,11 +152,22 @@ class FillingCalculate(View):
                 fill_len = 0
         return result
 
+    def set_date(self):
+        if self.date_list is not None and self.date_list != []:
+            self.t_start = self.date_list[0] + ' 00:00'
+            self.t_end = self.date_list[1] + ' 23:59'
+        else:
+            self.t_start = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d") + ' 00:00'
+            self.t_end = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d") + ' 23:59'
+
 
 class DailyCalculate(View):
     def __init__(self):
         self.t_start = ''
         self.t_end = ''
+        self.date_range = []
+        self.date_list = []
+        self.apsa_list = []
         self.apsa = None
         self.error = 0
         self.error_variables = []
@@ -181,36 +192,22 @@ class DailyCalculate(View):
 
     def get(self, request):
         # 获取daily日期参数
-        query_params = request.GET
-        start = query_params.get('start')
-        end = query_params.get('end')
-        self.refresh_list = query_params.get('apsa_list')
+        self.date_range = request.GET.getlist('date_list[]', [])
+        self.apsa_list = request.GET.getlist('apsa_list[]', [])
 
         # 检查Job状态
         if jobs.check('ONSITE_DAILY'):
             return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
 
-        # 设置需要计算的日期, 完成类型转换
-        if not end:
-            end = datetime.now().date()
-        else:
-            end = datetime.strptime(end, "%Y-%m-%d").date()
-
-        if not start:
-            start = datetime.now().date()
-        else:
-            start = datetime.strptime(start, "%Y-%m-%d").date()
-
         # 创建子线程
-        for d in self.set_date(start, end):
-            threading.Thread(target=self.calculate_main, args=(d,)).start()
+        threading.Thread(target=self.calculate_main).start()
 
         # 返回相应结果
         return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
 
-    def calculate_main(self, c_date):
+    def calculate_main(self):
         # 设定时间(参数：时间字符串)
-        self.set_time(c_date)
+        self.set_date()
 
         # 查询所有需要计算的Apsa
         apsas = Apsa.objects.filter(daily_js__gte=1, asset__confirm=1).order_by('daily_js')
@@ -219,59 +216,63 @@ class DailyCalculate(View):
         if self.refresh_list:
             apsas.filter(id__in=self.refresh_list)
 
-        for apsa in apsas:
-            # 传递apsa全局使用
-            self.apsa = apsa
+        for date in self.date_list:
+            # 设置起始日期
+            self.set_time(date)
+            print(1)
+            for apsa in apsas:
+                # 传递apsa全局使用
+                self.apsa = apsa
 
-            # 获取daily参数
-            self.get_daily_res()
-            d_res = self.daily_res
+                # 获取daily参数
+                self.get_daily_res()
+                d_res = self.daily_res
 
-            # 如果数据源错误，可以计算lin_tot的继续计算 (设备有可能会抖动，导致累积量出现小的负值)
-            if apsa.daily_js == 1 or apsa.daily_js == 5:
-                # 单机apsa计算
-                self.get_lin_tot_simple()
-            else:
-                if d_res['m3_prod'] >= -0.99 and d_res['m3_q6'] >= -0.99 and d_res['m3_q7'] >= -0.99 and d_res[
-                    'm3_peak'] >= -0.99:
-                    # 共用apsa计算(该机器固定补冷)
-                    self.get_lin_tot_complex()
+                # 如果数据源错误，可以计算lin_tot的继续计算 (设备有可能会抖动，导致累积量出现小的负值)
+                if apsa.daily_js == 1 or apsa.daily_js == 5:
+                    # 单机apsa计算
+                    self.get_lin_tot_simple()
                 else:
-                    self.error = 1
-                    self.error_variables.append('m3出现负数')
+                    if d_res['m3_prod'] >= -0.99 and d_res['m3_q6'] >= -0.99 and d_res['m3_q7'] >= -0.99 and d_res[
+                        'm3_peak'] >= -0.99:
+                        # 共用apsa计算(该机器固定补冷)
+                        self.get_lin_tot_complex()
+                    else:
+                        self.error = 1
+                        self.error_variables.append('m3出现负数')
 
-            # 若有停机写入停机
-            self.generate_malfunction()
-            # 写入daily
-            self.generate_daily()
-            # 写入daily_mod表
-            self.generate_daily_mod()
+                # 若有停机写入停机
+                self.generate_malfunction()
+                # 写入daily
+                self.generate_daily()
+                # 写入daily_mod表
+                self.generate_daily_mod()
 
-            # 清空全局变量
-            self.error = 0
-            self.error_variables = []
-            self.daily_res = {
-                'h_prod': 0,
-                'h_stpal': 0,
-                'h_stpdft': 0,
-                'h_stp400v': 0,
-                'm3_prod': 0,
-                'm3_tot': 0,
-                'm3_q1': 0,
-                'm3_peak': 0,
-                'm3_q5': 0,
-                'm3_q6': 0,
-                'm3_q7': 0,
-                'filling': 0,
-                'lin_tot': 0,
-                'flow_meter': 0,
-            }
-
+                # 清空全局变量
+                self.error = 0
+                self.error_variables = []
+                self.daily_res = {
+                    'h_prod': 0,
+                    'h_stpal': 0,
+                    'h_stpdft': 0,
+                    'h_stp400v': 0,
+                    'm3_prod': 0,
+                    'm3_tot': 0,
+                    'm3_q1': 0,
+                    'm3_peak': 0,
+                    'm3_q5': 0,
+                    'm3_q6': 0,
+                    'm3_q7': 0,
+                    'filling': 0,
+                    'lin_tot': 0,
+                    'flow_meter': 0,
+                }
         # 更新Job状态
         jobs.update('ONSITE_DAILY', 'OK')
 
     def set_time(self, date):
         # 设置起始时间 eg.计算9号数据 应该设置查询8，9两天数据
+        date = datetime.strptime(date, '%Y-%m-%d')
         self.t_start = (date + timedelta(days=-1)).strftime("%Y-%m-%d")
         self.t_end = (date + timedelta(days=0)).strftime("%Y-%m-%d")
 
@@ -421,16 +422,20 @@ class DailyCalculate(View):
                 defaults=default
             )
 
-    def set_date(self, start, end):
-        res = [start]
-        if start == end:
-            return res
-        for i in range(15):
-            new_date = start + timedelta(days=i + 1)
-            if new_date == end:
-                res.append(end)
-                return res
-            res.append(new_date)
+    def set_date(self):
+        if not self.date_range:
+            self.date_list.append(datetime.now().strftime("%Y-%m-%d"))
+        else:
+            t_start = self.date_range[0]
+            t_end = self.date_range[1]
+            while t_start != t_end:
+                self.date_list.append(t_start)
+                t_start = (datetime.strptime(t_start, '%Y-%m-%d') +timedelta(days=1)).strftime("%Y-%m-%d")
+            self.date_list.append(t_end)
+
+    def apsa_filter(self):
+        if self.apsa_list:
+            pass
 
 
 class FillMonthlyCalculate(APIView):
@@ -943,7 +948,6 @@ class DailyModModelView(RetrieveUpdateViewSet):
                 if request.data.get('m3_prod_mod') != old_prod or request.data.get(
                         'm3_peak_mod') != old_peak or request.data.get('m3_q6_mod') != old_q6 or request.data.get(
                     'm3_q7_mod') != old_q7:
-
                     # 如果更新了其中的任何一个，重新计算lin_tot
                     lin_tot = request.data.get('m3_prod_mod') * apsa.cooling_fixed / 100
                     lin_tot += request.data.get('m3_q6_mod') + request.data.get('m3_q7_mod') + request.data.get(

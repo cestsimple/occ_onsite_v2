@@ -424,13 +424,14 @@ class DailyCalculate(View):
 
     def set_date(self):
         if not self.date_range:
-            self.date_list.append(datetime.now().strftime("%Y-%m-%d"))
+            yesterday = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d")
+            self.date_list.append(yesterday)
         else:
             t_start = self.date_range[0]
             t_end = self.date_range[1]
             while t_start != t_end:
                 self.date_list.append(t_start)
-                t_start = (datetime.strptime(t_start, '%Y-%m-%d') +timedelta(days=1)).strftime("%Y-%m-%d")
+                t_start = (datetime.strptime(t_start, '%Y-%m-%d') + timedelta(days=1)).strftime("%Y-%m-%d")
             self.date_list.append(t_end)
 
     def apsa_filter(self):

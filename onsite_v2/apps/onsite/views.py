@@ -25,12 +25,14 @@ from utils.pagination import PageNum
 class FillingCalculate(View):
     def __init__(self):
         self.date_list = []
+        self.apsa_list = []
         self.t_start = ''
         self.t_end = ''
 
     def get(self, request):
         # 获取filling日期参数
         self.date_list = request.GET.getlist('date_list[]', [])
+        self.apsa_list = request.GET.getlist('apsa_list[]', [])
 
         # 检查Job状态
         if jobs.check('ONSITE_FILLING'):
@@ -46,11 +48,11 @@ class FillingCalculate(View):
         # 设置起始时间
         self.set_date()
 
-        # 获取所有需要计算的bulk的variable
-        variables = Variable.objects.filter(asset__bulk__filling_js__gte=1, daily_mark='LEVEL')
+        # 按照apsa过滤,获取所有需要计算的bulk的variable
+        self.set_variables()
 
         # 对每个储罐进行计算
-        for variable in variables:
+        for variable in self.variables:
             records = {}
             data = Record.objects.filter(variable=variable).filter(time__range=[self.t_start, self.t_end]).order_by(
                 'time')
@@ -160,6 +162,15 @@ class FillingCalculate(View):
             self.t_start = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d") + ' 00:00'
             self.t_end = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d") + ' 23:59'
 
+    def set_variables(self):
+        # 按照apsa过滤
+        if self.apsa_list:
+            sites = [x for x in Site.objects.filter(asset__apsa__id__in=self.apsa_list)]
+            assets = [x for x in Asset.objects.filter(site__in=sites, bulk__filling_js__gte=1)]
+            self.variables = [x for x in Variable.objects.filter(asset__in=assets, daily_mark='LEVEL')]
+        else:
+            self.variables = Variable.objects.filter(asset__bulk__filling_js__gte=1, daily_mark='LEVEL')
+
 
 class DailyCalculate(View):
     def __init__(self):
@@ -187,8 +198,6 @@ class DailyCalculate(View):
             'lin_tot': 0,
             'flow_meter': 0,
         }
-        #  部分刷新列表
-        self.refresh_list: list[int] = []
 
     def get(self, request):
         # 获取daily日期参数
@@ -213,8 +222,9 @@ class DailyCalculate(View):
         apsas = Apsa.objects.filter(daily_js__gte=1, asset__confirm=1).order_by('daily_js')
 
         # 过滤参数中传入的气站
-        if self.refresh_list:
-            apsas.filter(id__in=self.refresh_list)
+        if self.apsa_list:
+            self.apsa_list = [int(x) for x in self.apsa_list]
+            apsas = apsas.filter(id__in=self.apsa_list)
 
         for date in self.date_list:
             # 设置起始日期
@@ -433,10 +443,6 @@ class DailyCalculate(View):
                 self.date_list.append(t_start)
                 t_start = (datetime.strptime(t_start, '%Y-%m-%d') + timedelta(days=1)).strftime("%Y-%m-%d")
             self.date_list.append(t_end)
-
-    def apsa_filter(self):
-        if self.apsa_list:
-            pass
 
 
 class FillMonthlyCalculate(APIView):

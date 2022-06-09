@@ -254,10 +254,14 @@ class DailyCalculate(View):
 
                 # 若有停机写入停机
                 self.generate_malfunction()
-                # 写入daily
-                self.generate_daily()
-                # 写入daily_mod表
-                self.generate_daily_mod()
+
+                # 若daily存在且确认则跳过daily和mod
+                d = Daily.objects.filter(apsa=self.apsa, date=self.t_start)
+                if not (d.count() == 1 and d[0].confirm == 1):
+                    # 写入daily
+                    self.generate_daily()
+                    # 写入daily_mod表
+                    self.generate_daily_mod()
 
                 # 清空全局变量
                 self.error = 0
@@ -424,13 +428,16 @@ class DailyCalculate(View):
             # 添加停机信息
             default['t_end'] = self.t_start
 
-            # 生成记录
-            default['change_date'] = datetime.now().strftime("%Y-%m-%d %H:%M")
-            default['change_user'] = 'system'
-            Malfunction.objects.update_or_create(
-                apsa=self.apsa, t_start=self.t_start, stop_label=default['stop_label'],
-                defaults=default
-            )
+            # 判断是否存在且确认，是则跳过
+            m = Malfunction.objects.filter(apsa=self.apsa, t_start=self.t_start, stop_label=default['stop_label'])
+            if not (m.count() == 1 and m[0].confirm == 1):
+                # 生成或更新记录
+                default['change_date'] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                default['change_user'] = 'system'
+                Malfunction.objects.update_or_create(
+                    apsa=self.apsa, t_start=self.t_start, stop_label=default['stop_label'],
+                    defaults=default
+                )
 
     def set_date(self):
         if not self.date_range:

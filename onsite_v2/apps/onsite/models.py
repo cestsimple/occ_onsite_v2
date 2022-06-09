@@ -140,3 +140,4 @@ class MonthlyVariable(models.Model):
     apsa = models.ForeignKey(Apsa, on_delete='CASCADE', max_length=100, verbose_name='Apsa资产')
     variable = models.ForeignKey(Variable, on_delete='CASCADE', max_length=100, verbose_name='变量')
     usage = models.CharField(max_length=20, verbose_name="用处")
+    order = models.IntegerField(default=-1, verbose_name='显示顺序')

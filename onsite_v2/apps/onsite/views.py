@@ -985,7 +985,7 @@ class DailyModModelView(RetrieveUpdateViewSet):
                 daily_mod.lin_tot_mod = lin_tot
         else:
             daily_mod.lin_tot_mod = request.data.get('lin_tot_mod')
-        daily_mod.h_prod_mod = request.data.get('m3_prod_mod')
+        daily_mod.h_prod_mod = request.data.get('h_prod_mod')
         daily_mod.h_stpal_mod = request.data.get('h_stpal_mod')
         daily_mod.h_stpdft_mod = request.data.get('h_stpdft_mod')
         daily_mod.h_stp400v_mod = request.data.get('h_stp400v_mod')
@@ -1204,8 +1204,7 @@ class ReasonDetailModelView(ListViewSet):
 
 class MonthlyVariableModelView(ModelViewSet):
     # 查询集
-    queryset = MonthlyVariable.objects.order_by('apsa__asset__site__engineer_region', 'apsa__asset__rtu_name',
-                                                'variable')
+    queryset = MonthlyVariable.objects.order_by('apsa__asset__site__engineer_region', 'apsa')
     # 序列化器
     serializer_class = InvoiceVariableSerializer
     # 指定分页器
@@ -1236,12 +1235,15 @@ class MonthlyVariableModelView(ModelViewSet):
     def update(self, request):
         # 获取参数
         variable_id: int = request.data.get('variable')
-        apsa_id = request.data.get('apsa')
+        apsa_id: int = request.data.get('apsa')
         usage: list[str] = request.data.get('usage')
+        order_invoice: int = request.data.get('order_invoice')
+        order_monthly: int = request.data.get('order_monthly')
 
         old_usage = [x.usage for x in MonthlyVariable.objects.filter(variable=variable_id)]
 
         delete_item = [x for x in old_usage if x not in usage]
+        update_item = [x for x in old_usage if x in usage]
         create_item = [x for x in usage if x not in old_usage]
 
         variable = Variable.objects.get(id=variable_id)
@@ -1251,8 +1253,23 @@ class MonthlyVariableModelView(ModelViewSet):
             for usage in delete_item:
                 MonthlyVariable.objects.get(variable=variable_id, usage=usage).delete()
 
+            for usage in update_item:
+                m = MonthlyVariable.objects.get(variable=variable_id, usage=usage)
+                if usage == 'MONTHLY':
+                    m.order = order_monthly
+                elif usage == 'INVOICE':
+                    m.order = order_invoice
+                m.save()
+
             for usage in create_item:
-                MonthlyVariable.objects.create(variable=variable, apsa=apsa, usage=usage)
+                if not MonthlyVariable.objects.filter(variable=variable, apsa=apsa, usage=usage).count():
+                    m = MonthlyVariable.objects.create(variable=variable, apsa=apsa, usage=usage)
+                    if usage == 'MONTHLY':
+                        m.order = order_monthly
+                    elif usage == 'INVOICE':
+                        m.order = order_invoice
+                    m.save()
+
         except DatabaseError as e:
             return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
 
@@ -1263,21 +1280,28 @@ class MonthlyVariableModelView(ModelViewSet):
             apsa: int = request.data.get('apsa')
             variable: int = request.data.get('variable')
             usage: list[str] = request.data.get('usage')
-            apsa_obj = Apsa.objects.get(id=apsa)
-            variable_obj = Variable.objects.get(id=variable)
+            order_invoice: int = request.data.get('order_invoice')
+            order_monthly: int = request.data.get('order_monthly')
             if not all([apsa, variable, usage]):
                 raise
+            apsa_obj = Apsa.objects.get(id=apsa)
+            variable_obj = Variable.objects.get(id=variable)
         except Exception:
             return Response("参数错误", status=status.HTTP_400_BAD_REQUEST)
 
         try:
             for u in usage:
-                if not MonthlyVariable.objects.filter(apsa=apsa, variable=variable, usage=u).filter():
-                    MonthlyVariable.objects.create(
+                if not MonthlyVariable.objects.filter(apsa=apsa, variable=variable, usage=u).count():
+                    m = MonthlyVariable.objects.create(
                         apsa=apsa_obj,
                         variable=variable_obj,
                         usage=u.upper()
                     )
+                    if usage == 'MONTHLY':
+                        m.order = order_monthly
+                    elif usage == 'INVOICE':
+                        m.order = order_invoice
+                    m.save()
         except Exception:
             return Response("内部错误", status=status.HTTP_400_BAD_REQUEST)
 
@@ -1295,11 +1319,11 @@ class MonthlyVariableModelView(ModelViewSet):
 
     def list(self, request):
         queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(queryset, many=True)
+        res = self.aggregate(serializer.data)
+        page = self.paginate_queryset(res)
         if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            res = self.aggregate(serializer.data)
-            return self.get_paginated_response(res)
+            return self.get_paginated_response(page)
 
         serializer = self.get_serializer(queryset, many=True)
         res = self.aggregate(serializer.data)
@@ -1311,7 +1335,15 @@ class MonthlyVariableModelView(ModelViewSet):
             key = f"{data['apsa']}+{data['variable']}"
             if key in res.keys():
                 res[key]['usage'].append(data['usage'])
+                if data['usage'] == "MONTHLY" and data['order'] != -1:
+                    res[key]['order_monthly'] = data['order']
+                if data['usage'] == "INVOICE" and data['order'] != -1:
+                    res[key]['order_invoice'] = data['order']
             else:
+                if data['usage'] == "MONTHLY" and data['order'] != -1:
+                    data['order_monthly'] = data['order']
+                if data['usage'] == "INVOICE" and data['order'] != -1:
+                    data['order_invoice'] = data['order']
                 data['usage'] = [data['usage']]
                 res[key] = data
         return [res[x] for x in res.keys()]

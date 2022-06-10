@@ -157,10 +157,11 @@ class FillingCalculate(View):
     def set_date(self):
         if self.date_list is not None and self.date_list != []:
             self.t_start = self.date_list[0] + ' 00:00'
-            self.t_end = self.date_list[1] + ' 23:59'
+            d = (datetime.strptime(self.date_list[1], '%Y-%m-%d') + timedelta(days=1))
+            self.t_end = d.strftime("%Y-%m-%d") + ' 00:00'
         else:
             self.t_start = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d") + ' 00:00'
-            self.t_end = (datetime.now() + timedelta(days=-1)).strftime("%Y-%m-%d") + ' 23:59'
+            self.t_end = datetime.now().strftime("%Y-%m-%d") + ' 00:00'
 
     def set_variables(self):
         # 按照apsa过滤
@@ -902,6 +903,7 @@ class DailyModelView(ListUpdateViewSet):
                 cooling = apsa.cooling_fixed
             else:
                 cooling = ((lin_tot - peak - lin_consume) / m3_prod * 100) if m3_prod else 0
+            filling = d['filling'] * 0.65 * (apsa.temperature + 273.15) / 273.15
 
             # 添加数据
             res_list.append({
@@ -925,7 +927,7 @@ class DailyModelView(ListUpdateViewSet):
                 'lin_consume': round(lin_consume, 2),
                 'mod_id': round(mod_id, 2),
                 'cooling': round(cooling, 2),
-                'filling': round(d['filling'], 2),
+                'filling': round(filling, 2),
                 'vap_max': round(apsa.vap_max, 2),
                 'success': d['success'],
                 'confirm': d['confirm'],
@@ -1211,7 +1213,7 @@ class ReasonDetailModelView(ListViewSet):
 
 class MonthlyVariableModelView(ModelViewSet):
     # 查询集
-    queryset = MonthlyVariable.objects.order_by('apsa', 'variable__name')
+    queryset = MonthlyVariable.objects.order_by('apsa__asset__site__engineer__region', 'apsa', 'variable')
     # 序列化器
     serializer_class = InvoiceVariableSerializer
     # 指定分页器
@@ -1304,9 +1306,9 @@ class MonthlyVariableModelView(ModelViewSet):
                         variable=variable_obj,
                         usage=u.upper()
                     )
-                    if usage == 'MONTHLY':
+                    if u == 'MONTHLY':
                         m.order = order_monthly
-                    elif usage == 'INVOICE':
+                    elif u == 'INVOICE':
                         m.order = order_invoice
                     m.save()
         except Exception:
@@ -1335,7 +1337,10 @@ class MonthlyVariableModelView(ModelViewSet):
 
     def aggregate(self, querySet):
         res = []
-        queryKeys = set([x.variable_id for x in querySet])
+        queryKeys = []
+        for i in querySet:
+            if i.variable_id not in queryKeys:
+                queryKeys.append(i.variable_id)
 
         for key in queryKeys:
             usage = []
@@ -1343,9 +1348,9 @@ class MonthlyVariableModelView(ModelViewSet):
             order_invoice = None
             for q in MonthlyVariable.objects.filter(variable=key):
                 usage.append(q.usage)
-                if q.usage == 'MONTHLY':
+                if q.usage == 'MONTHLY' and q.order != -1:
                     order_monthly = q.order
-                if q.usage == 'INVOICE':
+                if q.usage == 'INVOICE' and q.order != -1:
                     order_invoice = q.order
             res.append({
                 'variable': q.variable_id,

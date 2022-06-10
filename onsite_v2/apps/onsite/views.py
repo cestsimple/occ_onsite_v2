@@ -1211,7 +1211,7 @@ class ReasonDetailModelView(ListViewSet):
 
 class MonthlyVariableModelView(ModelViewSet):
     # 查询集
-    queryset = MonthlyVariable.objects.order_by('apsa__asset__site__engineer_region', 'apsa')
+    queryset = MonthlyVariable.objects.order_by('apsa', 'variable__name')
     # 序列化器
     serializer_class = InvoiceVariableSerializer
     # 指定分页器
@@ -1326,34 +1326,37 @@ class MonthlyVariableModelView(ModelViewSet):
 
     def list(self, request):
         queryset = self.filter_queryset(self.get_queryset())
-        serializer = self.get_serializer(queryset, many=True)
-        res = self.aggregate(serializer.data)
+        res = self.aggregate(queryset)
         page = self.paginate_queryset(res)
         if page is not None:
             return self.get_paginated_response(page)
 
-        serializer = self.get_serializer(queryset, many=True)
-        res = self.aggregate(serializer.data)
         return Response(res)
 
-    def aggregate(self, data_list):
-        res = {}
-        for data in data_list:
-            key = f"{data['apsa']}+{data['variable']}"
-            if key in res.keys():
-                res[key]['usage'].append(data['usage'])
-                if data['usage'] == "MONTHLY" and data['order'] != -1:
-                    res[key]['order_monthly'] = data['order']
-                if data['usage'] == "INVOICE" and data['order'] != -1:
-                    res[key]['order_invoice'] = data['order']
-            else:
-                if data['usage'] == "MONTHLY" and data['order'] != -1:
-                    data['order_monthly'] = data['order']
-                if data['usage'] == "INVOICE" and data['order'] != -1:
-                    data['order_invoice'] = data['order']
-                data['usage'] = [data['usage']]
-                res[key] = data
-        return [res[x] for x in res.keys()]
+    def aggregate(self, querySet):
+        res = []
+        queryKeys = set([x.variable_id for x in querySet])
+
+        for key in queryKeys:
+            usage = []
+            order_monthly = None
+            order_invoice = None
+            for q in MonthlyVariable.objects.filter(variable=key):
+                usage.append(q.usage)
+                if q.usage == 'MONTHLY':
+                    order_monthly = q.order
+                if q.usage == 'INVOICE':
+                    order_invoice = q.order
+            res.append({
+                'variable': q.variable_id,
+                'apsa': q.apsa_id,
+                'rtu_name': q.apsa.asset.rtu_name,
+                'variable_name': q.variable.name,
+                'usage': usage,
+                'order_monthly': order_monthly,
+                'order_invoice': order_invoice
+            })
+        return res
 
 
 class InvoiceDiffModelView(ModelViewSet):

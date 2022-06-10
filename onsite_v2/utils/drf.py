@@ -13,6 +13,6 @@ def exception_handler(exc, context):
     if response is None:
         view = context['view']
         if isinstance(exc, DatabaseError):
-            response = Response({'detail': '服务器内部错误'}, status=status.HTTP_507_INSUFFICIENT_STORAGE)
+            response = Response({'detail': '服务器内部错误'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     return response

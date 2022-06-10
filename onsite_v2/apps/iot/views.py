@@ -123,8 +123,7 @@ class SiteData(View):
         sites_iot_dic = {}
         for content in contents:
             sites_iot_dic[content['id']] = content
-        sites_db_uuid = [x.uuid for x in Site.objects.filter(confirm__gt=-1)]
-
+        sites_db_uuid = [x.uuid for x in Site.objects.all()]
         site_new_uuid = [j for j in sites_iot_dic.keys() if j not in sites_db_uuid]
         site_delete_uuid = [k for k in sites_db_uuid if k not in sites_iot_dic.keys()]
         site_update_uuid = [l for l in sites_db_uuid if l in sites_iot_dic.keys()]
@@ -132,17 +131,18 @@ class SiteData(View):
         # 创建site
         list_create = []
         for new_site in site_new_uuid:
-            list_create.append(
-                Site(
-                    uuid=new_site,
-                    name=sites_iot_dic[new_site]['name'],
+            if Site.objects.filter(uuid=new_site).count() == 0:
+                list_create.append(
+                    Site(
+                        uuid=new_site,
+                        name=sites_iot_dic[new_site]['name'],
+                    )
                 )
-            )
 
         # 更新site
         list_update = []
         for update_site in site_update_uuid:
-            site = Site.objects.get(uuid=update_site)
+            site = Site.objects.get(uuid=update_site, confirm__gt=-1)
             site.name = sites_iot_dic[update_site]['name']
             if site.confirm == -1:
                 site.confirm = 0
@@ -202,7 +202,7 @@ class AssetData(View):
         assets_iot_dic = {}
         for content in contents:
             assets_iot_dic[content['id']] = content
-        assets_db_uuid = [x.uuid for x in Asset.objects.filter(confirm__gt=-1)]
+        assets_db_uuid = [x.uuid for x in Asset.objects.filter()]
 
         asset_new_uuid = [j for j in assets_iot_dic.keys() if j not in assets_db_uuid]
         asset_delete_uuid = [k for k in assets_db_uuid if k not in assets_iot_dic.keys()]
@@ -214,16 +214,17 @@ class AssetData(View):
             site = Site.objects.filter(uuid=assets_iot_dic[new_asset]['site']['id'])
             if site:
                 site = site[0]
-            list_create.append(
-                Asset(
-                    uuid=new_asset,
-                    name=assets_iot_dic[new_asset]['name'],
-                    rtu_name='',
-                    site=site,
-                    status=assets_iot_dic[new_asset]['status']['name'],
-                    variables_num=assets_iot_dic[new_asset]['totalVariables'],
+            if Asset.objects.filter(uuid=new_asset).count() == 0:
+                list_create.append(
+                    Asset(
+                        uuid=new_asset,
+                        name=assets_iot_dic[new_asset]['name'],
+                        rtu_name='',
+                        site=site,
+                        status=assets_iot_dic[new_asset]['status']['name'],
+                        variables_num=assets_iot_dic[new_asset]['totalVariables'],
+                    )
                 )
-            )
 
         # 更新
         list_update = []
@@ -327,7 +328,7 @@ class TagData(View):
                 name = asset.name
                 # 筛选出制氮机
                 if any(ele in name for ele in
-                       apsa_name_list) and 'WATER' not in name and 'FLOW' not in name and 'BULK' not in name:
+                       apsa_name_list) and 'BULK' not in name:
                     if name.split('_')[0] == 'APSA':
                         onsite_type = 'APSA'
                         onsite_series = name.split('_')[1]
@@ -443,12 +444,13 @@ class VariableData(View):
             for variable_create in variable_new_uuid:
                 uuid = variable_create
                 name = variable_iot_dic[variable_create]['name']
-                Variable.objects.create(
-                    uuid=uuid,
-                    name=name,
-                    asset=asset,
-                    daily_mark=self.get_daily_mark(name, asset.name)
-                )
+                if Variable.objects.filter(uuid=uuid).count() == 0:
+                    Variable.objects.create(
+                        uuid=uuid,
+                        name=name,
+                        asset=asset,
+                        daily_mark=self.get_daily_mark(name, asset.name)
+                    )
 
             # 更新变量
             for variable_update in variable_update_uuid:

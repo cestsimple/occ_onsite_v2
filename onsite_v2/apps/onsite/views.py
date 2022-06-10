@@ -330,9 +330,9 @@ class DailyCalculate(View):
                 l_1 = Record.objects.filter(variable__asset__bulk=bulk).get(time=t_end + ' 00:00:00').value
                 lin_bulks += (l_0 - l_1) / 100 * bulk.tank_size * 1000  # 单位:升(液态)
             except Exception:
-                l_0 = l_1 = lin_bulks = 0
+                lin_bulks = 0
                 self.error = 1
-                self.error_variables.append('lin_bulk')
+                self.error_variables.append('bulk_level')
             # 添加液位差数据至res中，以便计入数据库
 
         # 计算lin_tot,单位标立 = 储罐消耗 + 充液

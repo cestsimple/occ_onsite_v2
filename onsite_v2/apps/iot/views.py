@@ -344,7 +344,6 @@ class TagData(View):
 
         job.delete()
 
-
     def sort_asset(self):
         apsa_name_list = [
             'APSA_T', 'APSA_S', 'MOS', 'EOX', 'PSA',

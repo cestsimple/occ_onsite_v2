@@ -36,5 +36,10 @@ urlpatterns = [
 
     # job
     url(r'^asyncjob/$', views.AsyncJobModelView.as_view({'get': 'list'})),
-    url(r'^asyncjob/(?P<pk>\d+)/$', views.AsyncJobModelView.as_view({'delete': 'destroy'}))
+    url(r'^asyncjob/(?P<pk>\d+)/$', views.AsyncJobModelView.as_view({'delete': 'destroy'})),
+
+    # delete dup
+    url(r'^dup/site/', views.DeleteSiteDup.as_view()),
+    url(r'^dup/asset/', views.DeleteAssetDup.as_view()),
+    url(r'^dup/variable/', views.DeleteVariableDup.as_view())
 ]

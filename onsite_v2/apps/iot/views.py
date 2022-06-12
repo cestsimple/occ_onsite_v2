@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
+import uuid as uuid_gen
 
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
@@ -123,7 +124,7 @@ class SiteData(View):
         sites_iot_dic = {}
         for content in contents:
             sites_iot_dic[content['id']] = content
-        sites_db_uuid = [x.uuid for x in Site.objects.all()]
+        sites_db_uuid = [x.uuid for x in Site.objects.filter(confirm__gt=-1)]
         site_new_uuid = [j for j in sites_iot_dic.keys() if j not in sites_db_uuid]
         site_delete_uuid = [k for k in sites_db_uuid if k not in sites_iot_dic.keys()]
         site_update_uuid = [l for l in sites_db_uuid if l in sites_iot_dic.keys()]
@@ -131,28 +132,33 @@ class SiteData(View):
         # 创建site
         list_create = []
         for new_site in site_new_uuid:
-            if Site.objects.filter(uuid=new_site).count() == 0:
+            site = Site.objects.filter(uuid=new_site)
+            if site.count() == 0:
                 list_create.append(
                     Site(
                         uuid=new_site,
                         name=sites_iot_dic[new_site]['name'],
                     )
                 )
+            elif site.count() == 1:
+                site_update_uuid.append(new_site)
 
         # 更新site
         list_update = []
         for update_site in site_update_uuid:
-            site = Site.objects.get(uuid=update_site, confirm__gt=-1)
+            site = Site.objects.get(uuid=update_site)
             site.name = sites_iot_dic[update_site]['name']
             if site.confirm == -1:
                 site.confirm = 0
             list_update.append(site)
 
         # 删除site
+        num = 0
         for delete_site in site_delete_uuid:
             site = Site.objects.get(uuid=delete_site)
             site.confirm = -1
             site.save()
+            num += 1
 
         # 批量写入数据库
         try:
@@ -169,7 +175,7 @@ class SiteData(View):
         print(f"删除site:{len(site_delete_uuid)}个")
 
         # 更新Job状态
-        jobs.update('IOT_SITE', 'OK')
+        jobs.update("IOT_SITE", f"新建{len(list_create)}个气站,删除{num}个气站,更新{len(list_update)}个气站")
 
 
 class AssetData(View):
@@ -202,7 +208,7 @@ class AssetData(View):
         assets_iot_dic = {}
         for content in contents:
             assets_iot_dic[content['id']] = content
-        assets_db_uuid = [x.uuid for x in Asset.objects.filter()]
+        assets_db_uuid = [x.uuid for x in Asset.objects.filter(confirm__gt=-1)]
 
         asset_new_uuid = [j for j in assets_iot_dic.keys() if j not in assets_db_uuid]
         asset_delete_uuid = [k for k in assets_db_uuid if k not in assets_iot_dic.keys()]
@@ -214,7 +220,8 @@ class AssetData(View):
             site = Site.objects.filter(uuid=assets_iot_dic[new_asset]['site']['id'])
             if site:
                 site = site[0]
-            if Asset.objects.filter(uuid=new_asset).count() == 0:
+            asset = Asset.objects.filter(uuid=new_asset)
+            if asset.count() == 0:
                 list_create.append(
                     Asset(
                         uuid=new_asset,
@@ -225,6 +232,8 @@ class AssetData(View):
                         variables_num=assets_iot_dic[new_asset]['totalVariables'],
                     )
                 )
+            elif asset.count() == 1:
+                asset_update_uuid.append(new_asset)
 
         # 更新
         list_update = []
@@ -242,10 +251,12 @@ class AssetData(View):
             list_update.append(asset)
 
         # 删除
+        num = 0
         for delete_asset in asset_delete_uuid:
             asset = Asset.objects.get(uuid=delete_asset)
             asset.confirm = -1
             asset.save()
+            num += 1
 
         # 批量写入数据库
         try:
@@ -262,7 +273,7 @@ class AssetData(View):
         print(f"删除asset资产{len(asset_delete_uuid)}个")
 
         # 更新Job状态
-        jobs.update('IOT_ASSET', 'OK')
+        jobs.update("IOT_ASSET", f"新建{len(list_create)}个资产,删除{num}个资产,更新{len(list_update)}个资产")
 
 
 class TagData(View):
@@ -275,12 +286,12 @@ class TagData(View):
             return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
 
         # 是否强制全部刷新/部分刷新
-        force = request.GET.get('force')
-        if force:
-            self.assets = Asset.objects.filter(confirm__gte=0)
-            print(f"强制刷新模式，共刷新{len(self.assets)}个tag")
-        else:
+        fast = request.GET.get('fast')
+        if fast:
             self.assets = Asset.objects.filter(tags='')
+        else:
+            self.assets = Asset.objects.filter(confirm__gt=-1)
+            print(f"强制刷新模式，共刷新{len(self.assets)}个tag")
 
         # 创建子线程
         threading.Thread(target=self.refresh_main).start()
@@ -302,17 +313,37 @@ class TagData(View):
         jobs.update('IOT_TAG', 'OK')
 
     def refresh_sub(self, assets, h):
+        # 创建子线程job以便监控
+        job = AsyncJob.objects.create(
+            name=f'SUB_TAG_{threading.get_ident()}',
+            start_time=datetime.now(),
+            result='starting,e'
+        )
+
+        total = len(assets)
+        progress = 0
+
         for asset in assets:
-            url = f'{URL}/assets/{asset.uuid}/tags'
-            res = requests.get(url, headers=h).json()
-            for tag in res['content']:
-                if tag['name'] == 'TECHNO':
-                    tag_name = tag['labels'][0]['name']
-                    break
-            if not tag_name:
-                tag_name = 'NULL'
-            asset.tags = tag_name
-            asset.save()
+            try:
+                url = f'{URL}/assets/{asset.uuid}/tags'
+                res = requests.get(url, headers=h).json()
+                for tag in res['content']:
+                    if tag['name'] == 'TECHNO':
+                        tag_name = tag['labels'][0]['name']
+                        break
+                if not tag_name:
+                    tag_name = 'NULL'
+                asset.tags = tag_name
+                asset.save()
+
+                progress += 1
+                job.result = f"done: {progress}/{total}"
+                job.save()
+            except Exception as e:
+                print(url)
+
+        job.delete()
+
 
     def sort_asset(self):
         apsa_name_list = [
@@ -322,7 +353,7 @@ class TagData(View):
         bulk_list = []
 
         # 过滤ONSITE资产
-        for asset in Asset.objects.filter(tags='ONSITE'):
+        for asset in Asset.objects.filter(tags='ONSITE', confirm__gt=-1):
             # 若存在则不操作
             if Bulk.objects.filter(asset=asset).count() == 0 and Apsa.objects.filter(asset=asset).count() == 0:
                 name = asset.name
@@ -353,6 +384,35 @@ class TagData(View):
         # 写入数据库
         Apsa.objects.bulk_create(apsa_list)
         Bulk.objects.bulk_create(bulk_list)
+
+        apsa_result: str = ""
+        if apsa_list:
+            for a in apsa_list:
+                apsa_result += f"{a.asset_id},"
+            apsa_result = f"新建{len(apsa_list)}个APSA,asset_id:" + apsa_result[:-1]
+        else:
+            apsa_result = "本次没有检测到新增APSA，如有需要请手动添加"
+
+        bulk_result: str = ""
+        if bulk_list:
+            for a in bulk_list:
+                bulk_result += f"{a.asset_id},"
+            bulk_result = f"新建{len(bulk_list)}个APSA,asset_id:" + bulk_result[:-1]
+        else:
+            bulk_result = "本次没有检测到新增BULK，如有需要请手动添加"
+
+        AsyncJob.objects.create(
+            name='生成 APSA',
+            result=apsa_result,
+            start_time=datetime.now(),
+            finish_time=datetime.now()
+        )
+        AsyncJob.objects.create(
+            name='生成 BULK',
+            result=bulk_result,
+            start_time=datetime.now(),
+            finish_time=datetime.now()
+        )
 
     def engineer_main(self):
         """根据onsite tag获取site的工程师"""
@@ -425,44 +485,63 @@ class VariableData(View):
         jobs.update('IOT_VARIABLE', 'OK')
 
     def refresh_sub(self, assets, h):
+        # 创建子线程job以便监控
+        job = AsyncJob.objects.create(
+            name=f'SUB_VARIABLE_{threading.get_ident()}',
+            start_time=datetime.now(),
+            result='starting,e'
+        )
+
+        total = len(assets)
+        progress = 0
+
         for asset in assets:
             url = f'{URL}/assets/{asset.uuid}/variables?limit=1000'
             res = requests.get(url, headers=h).json()
 
             # 反序列化
             variable_iot_dic = {}
-            for content in res['content']:
-                variable_iot_dic[content['id']] = content
+            try:
+                for content in res['content']:
+                    variable_iot_dic[content['id']] = content
 
-            # 计算更新，删除列表
-            variable_old_uuid = [x.uuid for x in Variable.objects.filter(asset=asset, confirm__gt=-1)]
-            variable_new_uuid = [j for j in variable_iot_dic.keys() if j not in variable_old_uuid]
-            variable_delete_uuid = [k for k in variable_old_uuid if k not in variable_iot_dic.keys()]
-            variable_update_uuid = [l for l in variable_old_uuid if l in variable_iot_dic.keys()]
+                # 计算更新，删除列表
+                variable_old_uuid = [x.uuid for x in Variable.objects.filter(asset=asset, confirm__gt=-1)]
+                variable_new_uuid = [j for j in variable_iot_dic.keys() if j not in variable_old_uuid]
+                variable_delete_uuid = [k for k in variable_old_uuid if k not in variable_iot_dic.keys()]
+                variable_update_uuid = [l for l in variable_old_uuid if l in variable_iot_dic.keys()]
 
-            # 新建变量
-            for variable_create in variable_new_uuid:
-                uuid = variable_create
-                name = variable_iot_dic[variable_create]['name']
-                if Variable.objects.filter(uuid=uuid).count() == 0:
-                    Variable.objects.create(
-                        uuid=uuid,
-                        name=name,
-                        asset=asset,
-                        daily_mark=self.get_daily_mark(name, asset.name)
-                    )
+                # 新建变量
+                for variable_create in variable_new_uuid:
+                    uuid = variable_create
+                    name = variable_iot_dic[variable_create]['name']
+                    if Variable.objects.filter(uuid=uuid).count() == 0:
+                        Variable.objects.create(
+                            uuid=uuid,
+                            name=name,
+                            asset=asset,
+                            daily_mark=self.get_daily_mark(name, asset.name)
+                        )
 
-            # 更新变量
-            for variable_update in variable_update_uuid:
-                v = Variable.objects.get(uuid=variable_update)
-                v.name = variable_iot_dic[variable_update]['name']
-                v.save()
+                # 更新变量
+                for variable_update in variable_update_uuid:
+                    v = Variable.objects.get(uuid=variable_update)
+                    v.name = variable_iot_dic[variable_update]['name']
+                    v.save()
 
-            # 删除变量
-            for variable_delete in variable_delete_uuid:
-                v = Variable.objects.get(uuid=variable_delete)
-                v.confirm = -1
-                v.save()
+                # 删除变量
+                for variable_delete in variable_delete_uuid:
+                    v = Variable.objects.get(uuid=variable_delete)
+                    v.confirm = -1
+                    v.save()
+
+                progress += 1
+                job.result = f"done: {progress}/{total}"
+                job.save()
+            except Exception as e:
+                print(url)
+
+        job.delete()
 
     def get_daily_mark(self, name, asset_name):
         # Daily标志列表
@@ -662,7 +741,8 @@ class RecordData(View):
             self.end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T17:00:00.000Z'
         else:
             self.start = self.time_list[0] + 'T15:00:00.000Z'
-            self.end = (datetime.strptime(self.time_list[1], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")+ 'T17:00:00.000Z'
+            self.end = (datetime.strptime(self.time_list[1], "%Y-%m-%d") + timedelta(days=1)).strftime(
+                "%Y-%m-%d") + 'T17:00:00.000Z'
 
     def partially_filter(self):
         # 如果传入了apsa_id则过滤,否则跳过
@@ -677,6 +757,77 @@ class RecordData(View):
                     x.id for x in Asset.objects.filter(site=site_id, confirm=1)
                 ]
             self.assets = self.assets.filter(id__in=asset_id_list)
+
+
+class ManuelAllData(View):
+    def get(self, request):
+        pass
+
+
+class DeleteSiteDup(View):
+    def get(self, request):
+        # 获取unique uuid
+        uuid_list = set([x.uuid for x in Site.objects.all()])
+
+        delete_list = []
+
+        # 遍历uuid获取所有
+        for uuid in uuid_list:
+            sites = Site.objects.filter(uuid=uuid)
+            if sites.count() != 1:
+                print(f"重复了：{uuid}")
+                # 若同uuid的site不唯一
+                for site in sites:
+                    # 如果site未被关联过asset的外键
+                    if Asset.objects.filter(site=site).count() == 0:
+                        # 添加到删除列表
+                        site.delete()
+                        delete_list.append(uuid)
+
+        return JsonResponse({'msg': f"共有{len(delete_list)}个重复气站，可以被删除"})
+
+
+class DeleteAssetDup(View):
+    def get(self, request):
+        # 获取unique uuid
+        uuid_list = set([x.uuid for x in Asset.objects.all()])
+
+        delete_list = []
+        # 遍历uuid获取所有
+        for uuid in uuid_list:
+            assets = Asset.objects.filter(uuid=uuid).order_by('id')
+            count = assets.count()
+            if count != 1:
+                if count == 2:
+                    a = assets[1]
+                    print(a.id)
+                    vs = Variable.objects.filter(asset=a)
+                    for v in vs:
+                        v.delete()
+                    a.uuid = str(uuid_gen.uuid4())
+                    a.save()
+                else:
+                    print(uuid)
+                delete_list.append(uuid)
+        return JsonResponse({'msg': f"共有{len(delete_list)}个重复ASSET可以被删除"})
+
+
+class DeleteVariableDup(View):
+    def get(self, request):
+        # 获取unique uuid
+        uuid_list = set([x.uuid for x in Variable.objects.all()])
+
+        print(f"共{len(uuid_list)}个UUID")
+        delete_list = []
+        # 遍历uuid获取所有
+        for uuid in uuid_list:
+            vs = Variable.objects.filter(uuid=uuid).order_by('id')
+            if count := vs.count() != 1:
+                print(vs[0].asset_id)
+                if count == 2:
+                    print(uuid)
+                delete_list.append(uuid)
+        return JsonResponse({'msg': f"共有{len(delete_list)}个重复Variable可以被删除"})
 
 
 class SiteModelView(UpdateListRetrieveViewSet):
@@ -1149,25 +1300,25 @@ class RefreshAllAsset(APIView):
                 site_done = 1
 
             # 检测上一个任务完成再做
-            job = AsyncJob.objects.filter(name='IOT_SITE', start_time__gt=time_now, result='OK')
+            job = AsyncJob.objects.filter(name='IOT_SITE', start_time__gt=time_now).filter(~Q(result=''))
             if job.count() == 1 and not asset_done:
                 print("IOT_SITE完成")
                 asset.get(request)
                 asset_done = 1
 
-            job = AsyncJob.objects.filter(name='IOT_ASSET', start_time__gt=time_now, result='OK')
+            job = AsyncJob.objects.filter(name='IOT_ASSET', start_time__gt=time_now).filter(~Q(result=''))
             if job.count() == 1 and not tag_done:
                 print("IOT_ASSET完成")
                 tag.get(request)
                 tag_done = 1
 
-            job = AsyncJob.objects.filter(name='IOT_TAG', start_time__gt=time_now, result='OK')
+            job = AsyncJob.objects.filter(name='IOT_TAG', start_time__gt=time_now).filter(~Q(result=''))
             if job.count() == 1 and not variable_done:
                 print("IOT_TAG完成")
                 variable.get(request)
                 variable_done = 1
 
-            job = AsyncJob.objects.filter(name='IOT_VARIABLE', start_time__gt=time_now, result='OK')
+            job = AsyncJob.objects.filter(name='IOT_VARIABLE', start_time__gt=time_now).filter(~Q(result=''))
             if job.count() == 1:
                 print("IOT_VARIABLE完成")
                 # 任务完成，返回

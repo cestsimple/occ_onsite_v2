@@ -1,5 +1,3 @@
-import json
-
 from django.db import DatabaseError
 from django.db.models import Q
 from django.http import JsonResponse
@@ -9,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
+
 from utils.pagination import PageNum
 from .models import User, Role, Permission, RolePermission, UserRole
 from .serializer import UserSerializer, RoleSerializer, PermissionSerializer, RolePermissionSerializer
@@ -35,7 +34,7 @@ class AdminCreateView(View):
 
 class UserView(ModelViewSet):
     # 查询集
-    queryset = User.objects.all()
+    queryset = User.objects.order_by('-id')
     # 序列化器
     serializer_class = UserSerializer
     # 指定分页器

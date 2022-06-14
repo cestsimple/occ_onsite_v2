@@ -1328,11 +1328,13 @@ class MonthlyVariableModelView(ModelViewSet):
 
     def list(self, request):
         queryset = self.filter_queryset(self.get_queryset())
-        res = self.aggregate(queryset)
-        page = self.paginate_queryset(res)
-        if page is not None:
-            return self.get_paginated_response(page)
+        page = self.paginate_queryset(queryset)
 
+        if page is not None:
+            res = self.aggregate(page)
+            return self.get_paginated_response(res)
+
+        res = self.aggregate(queryset)
         return Response(res)
 
     def aggregate(self, querySet):

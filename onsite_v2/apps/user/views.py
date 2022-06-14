@@ -74,6 +74,8 @@ class UserView(ModelViewSet):
                 user.is_staff = is_staff
             user.level = level
             user.region = region
+            if not group:
+                group = ''
             user.group = group
             user.email = email
             if password != '' and password is not None:

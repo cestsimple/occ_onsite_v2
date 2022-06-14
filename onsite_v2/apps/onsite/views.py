@@ -802,26 +802,6 @@ class FillingMonthlyDetailView(APIView):
         return Response(res)
 
 
-class DailyOriginView(View):
-    def get(self, request, pk):
-        daily = Daily.objects.get(id=pk)
-        return JsonResponse({
-            'h_prod': daily.h_prod,
-            'h_stpal': daily.h_stpal,
-            'h_stpdft': daily.h_stpdft,
-            'h_stp400v': daily.h_stp400v,
-            'm3_prod': daily.m3_prod,
-            'm3_tot': daily.m3_tot,
-            'm3_q1': daily.m3_q1,
-            'm3_peak': daily.m3_peak,
-            'm3_q5': daily.m3_q5,
-            'm3_q6': daily.m3_q6,
-            'm3_q7': daily.m3_q7,
-            'lin_tot': daily.lin_tot,
-            'flow_meter': daily.flow_meter
-        })
-
-
 class DailyModelView(ListUpdateViewSet):
     # 查询集
     queryset = Daily.objects.order_by('confirm', 'apsa__asset__site__engineer__region', '-apsa__onsite_series',
@@ -932,6 +912,7 @@ class DailyModelView(ListUpdateViewSet):
                 'vap_max': round(apsa.vap_max, 2),
                 'success': d['success'],
                 'confirm': d['confirm'],
+                'mark': apsa.mark,
                 'comment': mod.comment,
             })
 
@@ -1011,6 +992,26 @@ class DailyModModelView(RetrieveUpdateViewSet):
         daily_mod.comment = request.data.get('comment')
         daily_mod.save()
         return Response({'status': 200, 'msg': '修改DailyMod成功'})
+
+
+class DailyOriginView(View):
+    def get(self, request, pk):
+        daily = Daily.objects.get(id=pk)
+        return JsonResponse({
+            'h_prod': daily.h_prod,
+            'h_stpal': daily.h_stpal,
+            'h_stpdft': daily.h_stpdft,
+            'h_stp400v': daily.h_stp400v,
+            'm3_prod': daily.m3_prod,
+            'm3_tot': daily.m3_tot,
+            'm3_q1': daily.m3_q1,
+            'm3_peak': daily.m3_peak,
+            'm3_q5': daily.m3_q5,
+            'm3_q6': daily.m3_q6,
+            'm3_q7': daily.m3_q7,
+            'lin_tot': daily.lin_tot,
+            'flow_meter': daily.flow_meter
+        })
 
 
 class MalfunctionModelView(ModelViewSet):

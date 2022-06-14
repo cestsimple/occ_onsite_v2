@@ -40,6 +40,9 @@ class UserSerializer(ModelSerializer):
                 'write_only': True,
                 'allow_blank': True
             },
+            'group': {
+                'allow_blank': True
+            }
         }
 
     # 重写create方法

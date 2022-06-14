@@ -598,7 +598,7 @@ class RecordData(View):
         # 获取请求头
         h = get_cognito()
         # 遍历asset，获取确认过的再计算
-        self.assets = Asset.objects.filter(confirm=2, tags='onsite')
+        self.assets = Asset.objects.filter(confirm=1, tags='onsite')
 
         # 如果是部分请求，则过滤
         self.partially_filter()

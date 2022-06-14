@@ -168,9 +168,9 @@ class FillingCalculate(View):
         if self.apsa_list:
             sites = [x for x in Site.objects.filter(asset__apsa__id__in=self.apsa_list)]
             assets = [x for x in Asset.objects.filter(site__in=sites, bulk__filling_js__gte=1)]
-            self.variables = [x for x in Variable.objects.filter(asset__in=assets, daily_mark='LEVEL')]
+            self.variables = [x for x in Variable.objects.filter(asset__in=assets, daily_mark='LEVEL', confirm__gt=-1)]
         else:
-            self.variables = Variable.objects.filter(asset__bulk__filling_js__gte=1, daily_mark='LEVEL')
+            self.variables = Variable.objects.filter(asset__bulk__filling_js__gte=1, daily_mark='LEVEL', confirm__gt=-1)
 
 
 class DailyCalculate(View):
@@ -293,7 +293,7 @@ class DailyCalculate(View):
 
     def get_daily_res(self):
         # 对于每个需要计算的variable
-        variables = Variable.objects.filter(asset__apsa=self.apsa).filter(~Q(daily_mark=''))
+        variables = Variable.objects.filter(asset__apsa=self.apsa, confirm__gt=-1).filter(~Q(daily_mark=''))
         for v in variables:
             try:
                 # 查询其所有daily_mark数据

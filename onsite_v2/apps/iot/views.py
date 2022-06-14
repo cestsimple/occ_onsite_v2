@@ -531,6 +531,7 @@ class VariableData(View):
                 # 删除变量
                 for variable_delete in variable_delete_uuid:
                     v = Variable.objects.get(uuid=variable_delete)
+                    v.daily_mark = ''
                     v.confirm = -1
                     v.save()
 

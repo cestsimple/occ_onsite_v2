@@ -78,7 +78,8 @@ class AssetApsaSerializer(ModelSerializer):
             'norminal_flow': apsa_obj.norminal_flow,
             'daily_bind': apsa_obj.daily_bind,
             'flow_meter': apsa_obj.flow_meter,
-            'cooling_fixed': apsa_obj.cooling_fixed
+            'cooling_fixed': apsa_obj.cooling_fixed,
+            'mark': apsa_obj.mark
         }
 
     class Meta:

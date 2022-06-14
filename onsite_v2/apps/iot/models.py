@@ -73,6 +73,7 @@ class Apsa(models.Model):
     daily_bind = models.IntegerField(verbose_name='daily绑定资产id', default=-1)
     flow_meter = models.IntegerField(verbose_name='流量计变量id', default=-1)
     cooling_fixed = models.FloatField(max_length=10, verbose_name='cooling设定值', default=0)
+    mark = models.CharField(max_length=300, default='', verbose_name='额外标识')
 
     class Meta:
         ordering = ['id']

@@ -685,12 +685,10 @@ class RecordData(View):
                     pass
                 else:
                     res = res.json()['timeseries']
-                    print(len(res))
                     for i in res.keys():
                         # 时间转化
                         time_array = time.localtime(int(i[:-3]))
                         t = time.strftime("%Y-%m-%d %H:%M", time_array)
-                        print(t)
                         # 过滤
                         value = res[i]
                         if variable.daily_mark == 'LEVEL' and not t.endswith('0'):
@@ -742,9 +740,9 @@ class RecordData(View):
             self.start = (t + timedelta(days=-2)).strftime("%Y-%m-%d") + 'T15:00:00.000Z'
             self.end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T17:00:00.000Z'
         else:
-            self.start = self.time_list[0] + 'T15:00:00.000Z'
-            self.end = (datetime.strptime(self.time_list[1], "%Y-%m-%d") + timedelta(days=1)).strftime(
-                "%Y-%m-%d") + 'T17:00:00.000Z'
+            self.start = (datetime.strptime(self.time_list[0], "%Y-%m-%d") + timedelta(days=-1)).strftime(
+                "%Y-%m-%d") + 'T15:00:00.000Z'
+            self.end = self.time_list[0] + 'T17:00:00.000Z'
 
     def partially_filter(self):
         # 如果传入了apsa_id则过滤,否则跳过
@@ -1014,7 +1012,7 @@ class VariableModelView(UpdateListRetrieveViewSet):
 class AssetModelView(UpdateListRetrieveViewSet):
     """自定义SiteMixinView"""
     # 查询集
-    queryset = Asset.objects.filter(tags='ONSITE')
+    queryset = Asset.objects.filter(tags='ONSITE').order_by('site__engineer__region', 'rtu_name')
     # 序列化器
     serializer_class = AssetApsaSerializer
     # 分页器

@@ -325,9 +325,10 @@ class DailyCalculate(View):
                 x.quantity for x in Filling.objects.filter(bulk=bulk, time_1__range=[t_start, t_end])
             ])
             # 计算储罐首尾液位差量
+            variable = Variable.objects.get(asset=bulk.asset, daily_mark='LEVEL')
             try:
-                l_0 = Record.objects.filter(variable__asset__bulk=bulk).get(time=t_start + ' 00:00:00').value
-                l_1 = Record.objects.filter(variable__asset__bulk=bulk).get(time=t_end + ' 00:00:00').value
+                l_0 = Record.objects.filter(variable=variable).get(time=t_start + ' 00:00:00').value
+                l_1 = Record.objects.filter(variable=variable).get(time=t_end + ' 00:00:00').value
                 lin_bulks += (l_0 - l_1) / 100 * bulk.tank_size * 1000  # 单位:升(液态)
             except Exception:
                 lin_bulks = 0

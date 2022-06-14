@@ -1329,7 +1329,7 @@ class MonthlyVariableModelView(ModelViewSet):
         return Response({'status': 200, 'msg': '删除权限成功'})
 
     def list(self, request):
-        queryset = self.filter_queryset(self.get_queryset())
+        queryset = self.filter_queryset(self.get_queryset()).values('variable').distinct()
         page = self.paginate_queryset(queryset)
 
         if page is not None:
@@ -1341,16 +1341,12 @@ class MonthlyVariableModelView(ModelViewSet):
 
     def aggregate(self, querySet):
         res = []
-        queryKeys = []
-        for i in querySet:
-            if i.variable_id not in queryKeys:
-                queryKeys.append(i.variable_id)
-
-        for key in queryKeys:
+        for v in querySet:
+            id = v['variable']
             usage = []
             order_monthly = None
             order_invoice = None
-            for q in MonthlyVariable.objects.filter(variable=key):
+            for q in MonthlyVariable.objects.filter(variable=id):
                 usage.append(q.usage)
                 if q.usage == 'MONTHLY' and q.order != -1:
                     order_monthly = q.order

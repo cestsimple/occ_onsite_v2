@@ -597,7 +597,7 @@ class RecordData(View):
         # 获取请求头
         h = get_cognito()
         # 遍历asset，获取确认过的再计算
-        self.assets = Asset.objects.filter(confirm=1, tags='onsite')
+        self.assets = Asset.objects.filter(confirm=2, tags='onsite')
 
         # 如果是部分请求，则过滤
         self.partially_filter()
@@ -608,7 +608,7 @@ class RecordData(View):
         # 获取assets对应变量,去除没有dailymark的
         for asset in self.assets:
             try:
-                variables = [x for x in Variable.objects.filter(asset=asset).filter(~Q(daily_mark=''))]
+                variables = [x for x in Variable.objects.filter(asset=asset, confirm__gt=-1).filter(~Q(daily_mark=''))]
                 if asset.is_apsa and Apsa.objects.get(asset=asset).daily_js:
                     length = len(variables)
                     if length == 11 or length == 12:
@@ -684,10 +684,12 @@ class RecordData(View):
                     pass
                 else:
                     res = res.json()['timeseries']
+                    print(len(res))
                     for i in res.keys():
                         # 时间转化
                         time_array = time.localtime(int(i[:-3]))
                         t = time.strftime("%Y-%m-%d %H:%M", time_array)
+                        print(t)
                         # 过滤
                         value = res[i]
                         if variable.daily_mark == 'LEVEL' and not t.endswith('0'):

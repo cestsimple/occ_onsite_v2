@@ -906,6 +906,7 @@ class ApsaModelView(UpdateListRetrieveViewSet):
         daily_bind = request.data.get('daily_bind')
         cooling_fixed = request.data.get('cooling_fixed')
         comment = request.data.get('comment')
+        mark = request.data.get('mark')
 
         try:
             apsa = Apsa.objects.get(id=int(pk))
@@ -1094,6 +1095,7 @@ class AssetModelView(UpdateListRetrieveViewSet):
                 apsa.daily_js = apsa_dic['daily_js']
                 apsa.temperature = apsa_dic['temperature']
                 apsa.norminal_flow = apsa_dic['norminal_flow']
+                apsa.mark = apsa_dic['mark']
                 if apsa_dic['vap_max']:
                     apsa.vap_max = apsa_dic['vap_max']
                 if apsa_dic['vap_type']:

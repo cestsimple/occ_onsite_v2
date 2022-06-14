@@ -1302,7 +1302,7 @@ class MonthlyVariableModelView(ModelViewSet):
 
         try:
             for u in usage:
-                if not MonthlyVariable.objects.filter(apsa=apsa, variable=variable, usage=u).count():
+                if not MonthlyVariable.objects.filter(variable=variable, usage=u).count():
                     m = MonthlyVariable.objects.create(
                         apsa=apsa_obj,
                         variable=variable_obj,
@@ -1319,9 +1319,9 @@ class MonthlyVariableModelView(ModelViewSet):
         return Response({'status': 200, 'msg': 'ok'})
 
     def destroy(self, request, *args, **kwargs):
+        pk = kwargs['pk']
         try:
-            record = self.get_object()
-            for x in MonthlyVariable.objects.filter(variable=record.variable):
+            for x in MonthlyVariable.objects.filter(variable=pk):
                 x.delete()
         except Exception as e:
             print(e)

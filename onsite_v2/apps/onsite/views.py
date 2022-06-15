@@ -1074,10 +1074,6 @@ class MalfunctionModelView(ModelViewSet):
         stop_hour = float(request.data.get('stop_hour'))
         stop_consumption = float(request.data.get('stop_consumption'))
 
-        # 验证是否存在充液记录
-        if Malfunction.objects.filter(apsa=apsa_id, t_start=t_start).count() != 0:
-            return Response(f'创建失败，气站时间冲突，已存在该记录', status=status.HTTP_400_BAD_REQUEST)
-
         try:
             Malfunction.objects.create(
                 apsa_id=int(apsa_id),

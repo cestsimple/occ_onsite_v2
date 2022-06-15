@@ -49,7 +49,7 @@ class UserView(ModelViewSet):
 
         query = self.queryset
         if engineer:
-            query = query.filter(~Q(group='occ'))
+            query = query.filter(~Q(group='')).filter(~Q(group='occ'))
         if region:
             query = query.filter(region=region)
 

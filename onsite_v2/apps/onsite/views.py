@@ -1094,7 +1094,8 @@ class MalfunctionModelView(ModelViewSet):
                 mt_comment=mt_comment,
                 occ_comment=occ_comment,
                 change_user=change_user,
-                change_date=datetime.now()
+                change_date=datetime.now(),
+                confirm=1
             )
         except DatabaseError as e:
             return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)

@@ -136,7 +136,7 @@ class FillingCalculate(View):
         # 循环统计长度
         for i in range(len(diff_list)):
             # 液位差<0 是否为上升趋势
-            if diff_list[i] < 0:
+            if diff_list[i] < -0.01:
                 # 如果为第一个上升到额点
                 if not fill_len:
                     # 长度从0改为1
@@ -725,7 +725,6 @@ class FillingModelView(ModelViewSet):
         else:
             t = filling.time_1.strftime('%Y-%m-%d')
         bulk = filling.bulk
-        site = Site.objects.get(asset__bulk=bulk)
         # 有可能有两台apsa
         apsa = Apsa.objects.get(asset__rtu_name=bulk.asset.rtu_name, asset__is_apsa=1, asset__confirm=1)
         try:
@@ -890,7 +889,7 @@ class DailyModelView(ListUpdateViewSet):
             res_list.append({
                 'id': d['id'],
                 'date': d['date'].split(' ')[0],
-                'region': site.engineer.region,
+                'region': site.engineer.region if site.engineer else '',
                 'series': apsa.onsite_series,
                 'rtu_name': asset.rtu_name,
                 'norminal': apsa.norminal_flow,
@@ -1363,7 +1362,7 @@ class MonthlyVariableModelView(ModelViewSet):
 
 class InvoiceDiffModelView(ModelViewSet):
     # 查询集
-    queryset = InvoiceDiff.objects.order_by('apsa__asset__rtu_name', 'variable__name')
+    queryset = InvoiceDiff.objects.order_by('apsa__asset__rtu_name', 'variable__monthlyvariable__order')
     # 序列化器
     serializer_class = InvoiceDiffSerializer
     # 指定分页器

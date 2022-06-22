@@ -352,8 +352,8 @@ class DailyCalculate(View):
         cooling_fixed = self.apsa.cooling_fixed
 
         # 根据cooling反推lin_tot，再加上停机用液和Peak
-        lin_tot = round(self.daily_res['m3_prod'] * cooling_fixed / 100, 2)
-        lin_tot += round(self.daily_res['m3_q6'] + self.daily_res['m3_q7'] + self.daily_res['m3_peak'], 2)
+        lin_tot = self.daily_res['m3_prod'] * cooling_fixed / 100
+        lin_tot += self.daily_res['m3_q6'] + self.daily_res['m3_q7'] + self.daily_res['m3_peak']
 
         # 保存数据
         self.daily_res['lin_tot'] = round(lin_tot, 2)
@@ -550,7 +550,7 @@ class InvoiceDiffCalculate(APIView):
     def get(self, request):
         # 获取计算日期
         query_params = request.GET
-        start = query_params.get('start')
+        date = query_params.getlist('date[]')
         self.region = query_params.get('region')
 
         # 检查Job状态
@@ -559,13 +559,10 @@ class InvoiceDiffCalculate(APIView):
 
         # 设置时间
         try:
-            day = int(start.split('-')[-1])
-            month = datetime.today().month
-            year = datetime.today().year
-            self.end = datetime(year, month, day)
-            self.start = self.end + relativedelta(months=-1)
+            self.end = date[-1]
+            self.start = date[0]
         except Exception:
-            jobs.update('ONSITE_INVOICE_DIFF', 'ERROR: QueryDateSetError')
+            jobs.update('ONSITE_INVOICE_DIFF', 'ERROR: SetQueryDateError')
             return JsonResponse({'status': 400, 'msg': '查询时间设置错误'})
 
         # 创建子线程
@@ -752,14 +749,43 @@ class FillingMonthlyView(ListUpdateViewSet):
         query = self.request.query_params
         date = query.get('date')
         region = query.get('region')
+        self.aggr = query.get('aggr')
 
         if region:
             self.queryset = self.queryset.filter(bulk__asset__site__engineer__region=region)
 
         if date:
-            self.queryset = self.queryset.filter(date=date + '-7')
+            self.queryset = self.queryset.filter(date=date + '-21')
+
+        if self.aggr:
+            self.queryset = self.queryset.values('bulk__asset__rtu_name').distinct()
 
         return self.queryset
+
+    def list(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            if self.aggr:
+                rsp = []
+                for site in page:
+                    rtu_name = site['bulk__asset__rtu_name']
+                    quantity = 0
+                    date = ''
+                    for i in FillingMonthly.objects.filter(bulk__asset__rtu_name=rtu_name):
+                        date = i.date
+                        quantity += i.quantity
+                    rsp.append({
+                        "date": date.strftime('%Y-%m-%d'),
+                        "rtu_name": rtu_name,
+                        "quantity": round(quantity, 2)
+                    })
+                return self.get_paginated_response(rsp)
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class FillingMonthlyDetailView(APIView):
@@ -1387,3 +1413,7 @@ class InvoiceDiffModelView(ModelViewSet):
             self.queryset = self.queryset.filter(usage=usage.upper())
 
         return self.queryset
+
+    def list(self, request):
+        q = self.request.query_params
+        print(q)

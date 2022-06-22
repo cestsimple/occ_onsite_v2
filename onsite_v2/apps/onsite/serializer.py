@@ -128,6 +128,7 @@ class InvoiceDiffSerializer(serializers.ModelSerializer):
     rtu_name = serializers.SerializerMethodField()
     diff = serializers.SerializerMethodField()
     variable_name = serializers.SerializerMethodField()
+    variable_id = serializers.SerializerMethodField()
 
     def get_date(self, obj):
         return str(obj.date)[:10]
@@ -142,6 +143,9 @@ class InvoiceDiffSerializer(serializers.ModelSerializer):
         if obj.variable.name == 'H_PROD':
             return obj.end
         return round(obj.end - obj.start, 2)
+
+    def get_variable_id(self, obj):
+        return obj.variable.id
 
     class Meta:
         model = InvoiceDiff

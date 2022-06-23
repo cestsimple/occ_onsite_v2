@@ -1400,18 +1400,34 @@ class InvoiceDiffModelView(ModelViewSet):
         query = self.request.query_params
         usage = query.get('usage')
         region = query.get('region')
+        name = query.get('name')
         t_start = query.getlist('date[]')[0] + " 00:00:00"
         t_end = query.getlist('date[]')[1] + " 00:00:00"
         queryset = MonthlyVariable.objects.filter(usage=usage)
-        if region:
+        if name:
+            name = name.strip().upper()
+            queryset = queryset.filter(
+                Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
+            )
+        if region and not name:
             queryset = queryset.filter(apsa__asset__site__engineer__region=region)
-        queryset = queryset.order_by('apsa__asset__rtu_name', 'variable__monthlyvariable__order')
-        page = self.paginate_queryset(queryset.values('variable').distinct())
+        # unordered_variable = {}
+        # for x in queryset:
+        #     unordered_variable[f"{x.variable.asset.rtu_name}{x.order}"] = x.variable_id
+
+        keys = []
+        v_ids = []
+        for i in queryset:
+            if i not in keys:
+                keys.append(i.variable_id)
+                v_ids.append(i.variable_id)
+
+        page = self.paginate_queryset(v_ids)
 
         if page is not None:
             rsp = []
             for q in page:
-                v = Variable.objects.get(id=q['variable'])
+                v = Variable.objects.get(id=q)
 
                 r1 = Record.objects.filter(variable=v, time=t_start)
                 if r1.count() == 1:
@@ -1429,7 +1445,9 @@ class InvoiceDiffModelView(ModelViewSet):
                     "date": t_end.split(' ')[0],
                     "rtu_name": v.asset.rtu_name,
                     "variable_name": v.name,
-                    "start": round(l_start,2 ),
+                    "variable_id": v.id,
+                    "order": MonthlyVariable.objects.get(variable=v, usage=usage).order,
+                    "start": round(l_start, 2),
                     "end": round(l_end, 2),
                     "diff": round(l_end-l_start, 2)
                 })

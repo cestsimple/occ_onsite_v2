@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 import uuid as uuid_gen
+from itertools import chain
 
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
@@ -19,6 +20,7 @@ from datetime import datetime, timedelta
 from utils import jobs
 from .serializer import SiteSerializer, ApsaSerializer, BulkSerializer, VariableSerializer, AssetApsaSerializer, \
     AssetBulkSerializer, AsyncJobSerializer
+from ..onsite.models import MonthlyVariable
 from ..user.models import User
 from django.db.models import Q
 
@@ -603,39 +605,16 @@ class RecordData(View):
         # 如果是部分请求，则过滤
         self.partially_filter()
 
-        total_apsa = 0
-        total_bulk = 0
-        total_record = 0
         # 获取assets对应变量,去除没有dailymark的
         for asset in self.assets:
-            try:
-                variables = [x for x in Variable.objects.filter(asset=asset, confirm__gt=-1).filter(~Q(daily_mark=''))]
-                if asset.is_apsa and Apsa.objects.get(asset=asset).daily_js:
-                    length = len(variables)
-                    if length == 11 or length == 12:
-                        self.variables += variables
-                        total_apsa += 1
-                        total_record += length * 2
-                    else:
-                        asset.confirm = 0
-                        asset.save()
-                        print(f"APSA variables总数验证错误：\n asset:{asset.rtu_name} 变量数:{length} \n: 变量名如下：")
-                        for i in variables:
-                            print(i.name)
-                elif not asset.is_apsa and Bulk.objects.get(asset=asset).filling_js:
-                    length = len(variables)
-                    if length == 1:
-                        self.variables += variables
-                        total_bulk += 1
-                        total_record += length * 144
-                    else:
-                        asset.confirm = 0
-                        asset.save()
-                        print(f"BULK variables总数验证错误：\n asset:{asset.rtu_name}")
-            except Exception as e:
-                print(e)
-                print(f"asset_id={asset.id},is_apsa={asset.is_apsa}")
-        print(f"有{total_apsa}个apsa和{total_bulk}个bulk,共:{len(self.variables)}个变量,预计{total_record}条记录")
+            # 获取所有daily和monthly变量去重
+            variables_daily = [x['id'] for x in Variable.objects.filter(asset=asset, confirm__gt=-1).filter(~Q(daily_mark='')).values('id')]
+            variables_monthly = [x['variable_id'] for x in MonthlyVariable.objects.filter(apsa__asset=asset).values('variable_id')]
+            variables = set(chain(variables_daily, variables_monthly))
+            self.variables += variables
+
+        total = len(self.variables)
+        print(f"共:{total}个变量,预计{int(total/11.6)}条记录")
         # 分发任务至子线程
         multi_thread_task(multi_num=8, target_task=self.refresh_sub, task_args=(self.variables, h))
         # 更新job状态
@@ -649,7 +628,7 @@ class RecordData(View):
         # 设置重试列表
         error = 0
         retry_record = {}
-        variables_list = [x for x in variables]
+        variables_list = [Variable.objects.get(id=x) for x in variables]
         ori_len = len(variables_list)
 
         # 设定查询时间
@@ -694,8 +673,8 @@ class RecordData(View):
                         if variable.daily_mark == 'LEVEL' and not t.endswith('0'):
                             # 若是level，不要15分钟的点
                             pass
-                        elif variable.daily_mark in daily_mark_list and not t.endswith('00:00'):
-                            # 若是M3_PEAK，只要零点的
+                        elif variable.daily_mark != 'LEVEL' and not t.endswith('00:00'):
+                            # 非level，只要零点的
                             pass
                         else:
                             Record.objects.update_or_create(

@@ -1426,7 +1426,7 @@ class InvoiceDiffModelView(ModelViewSet):
                     l_end = 0
 
                 rsp.append({
-                    "date": l_end,
+                    "date": t_end.split(' ')[0],
                     "rtu_name": v.asset.rtu_name,
                     "variable_name": v.name,
                     "start": round(l_start,2 ),

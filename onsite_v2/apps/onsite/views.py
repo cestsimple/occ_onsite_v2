@@ -1396,24 +1396,44 @@ class InvoiceDiffModelView(ModelViewSet):
     # 权限
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        # 条件过滤功能
-        querry = self.request.query_params
-        usage = querry.get('usage')
-        region = querry.get('region')
-        date = querry.get('date')
-
-        if region:
-            self.queryset = self.queryset.filter(apsa__asset__site__engineer__region=region)
-
-        if date:
-            self.queryset = self.queryset.filter(date=date)
-
-        if usage:
-            self.queryset = self.queryset.filter(usage=usage.upper())
-
-        return self.queryset
-
     def list(self, request):
-        q = self.request.query_params
-        print(q)
+        query = self.request.query_params
+        usage = query.get('usage')
+        region = query.get('region')
+        t_start = query.getlist('date[]')[0] + " 00:00:00"
+        t_end = query.getlist('date[]')[1] + " 00:00:00"
+        queryset = MonthlyVariable.objects.filter(usage=usage)
+        if region:
+            queryset = queryset.filter(apsa__asset__site__engineer__region=region)
+        queryset = queryset.order_by('apsa__asset__rtu_name', 'variable__monthlyvariable__order')
+        page = self.paginate_queryset(queryset.values('variable').distinct())
+
+        if page is not None:
+            rsp = []
+            for q in page:
+                v = Variable.objects.get(id=q['variable'])
+
+                r1 = Record.objects.filter(variable=v, time=t_start)
+                if r1.count() == 1:
+                    l_start = r1[0].value
+                else:
+                    l_start = 0
+
+                r2 = Record.objects.filter(variable=v, time=t_end)
+                if r2.count() == 1:
+                    l_end = r2[0].value
+                else:
+                    l_end = 0
+
+                rsp.append({
+                    "date": l_end,
+                    "rtu_name": v.asset.rtu_name,
+                    "variable_name": v.name,
+                    "start": round(l_start,2 ),
+                    "end": round(l_end, 2),
+                    "diff": round(l_end-l_start, 2)
+                })
+            return self.get_paginated_response(rsp)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)

@@ -757,35 +757,58 @@ class FillingMonthlyView(ListUpdateViewSet):
         if date:
             self.queryset = self.queryset.filter(date=date + '-21')
 
-        if self.aggr:
-            self.queryset = self.queryset.values('bulk__asset__rtu_name').distinct()
-
         return self.queryset
 
     def list(self, request):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            if self.aggr:
-                rsp = []
-                for site in page:
-                    rtu_name = site['bulk__asset__rtu_name']
-                    quantity = 0
-                    date = ''
-                    for i in FillingMonthly.objects.filter(bulk__asset__rtu_name=rtu_name):
-                        date = i.date
-                        quantity += i.quantity
-                    rsp.append({
-                        "date": date.strftime('%Y-%m-%d'),
-                        "rtu_name": rtu_name,
-                        "quantity": round(quantity, 2)
-                    })
-                return self.get_paginated_response(rsp)
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+        queryset = self.get_queryset()
+        sites = [x['bulk__asset__rtu_name'] for x in queryset.values('bulk__asset__rtu_name').distinct()]
+        page_sites = self.paginate_queryset(sites)
 
+        if page_sites is not None:
+            q = queryset.filter(bulk__asset__rtu_name__in=page_sites)
+
+            if self.aggr == '1':
+                rsp = self.aggregate(page_sites, q)
+            else:
+                serializer = self.get_serializer(q, many=True)
+                rsp = serializer.data
+
+            return self.get_paginated_response(rsp)
+            # if self.aggr:
+            #     rsp = []
+            #     for site in page:
+            #         rtu_name = site['bulk__asset__rtu_name']
+            #         quantity = 0
+            #         date = ''
+            #         for i in FillingMonthly.objects.filter(bulk__asset__rtu_name=rtu_name):
+            #             date = i.date
+            #             quantity += i.quantity
+            #         rsp.append({
+            #             "date": date.strftime('%Y-%m-%d'),
+            #             "rtu_name": rtu_name,
+            #             "quantity": round(quantity, 2)
+            #         })
+            #     return self.get_paginated_response(rsp)
+            # serializer = self.get_serializer(page, many=True)
+            # return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+    def aggregate(self, sites, q):
+        rsp = []
+        quantity = 0
+        date = ''
+        for site in sites:
+            for i in q.filter(bulk__asset__rtu_name=site):
+                date = i.date
+                quantity += i.quantity
+            rsp.append({
+                        "date": date.strftime('%Y-%m-%d'),
+                        "rtu_name": site,
+                        "filling": 0,
+                        "quantity": round(quantity, 2)
+                    })
+        return rsp
 
 
 class FillingMonthlyDetailView(APIView):
@@ -1411,9 +1434,6 @@ class InvoiceDiffModelView(ModelViewSet):
             )
         if region and not name:
             queryset = queryset.filter(apsa__asset__site__engineer__region=region)
-        # unordered_variable = {}
-        # for x in queryset:
-        #     unordered_variable[f"{x.variable.asset.rtu_name}{x.order}"] = x.variable_id
 
         keys = []
         v_ids = []

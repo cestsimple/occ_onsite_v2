@@ -88,6 +88,16 @@ class FillingMonthlySerializer(serializers.ModelSerializer):
     asset_name = serializers.SerializerMethodField()
     rtu_name = serializers.SerializerMethodField()
     tank_size = serializers.SerializerMethodField()
+    region = serializers.SerializerMethodField()
+    filling = serializers.SerializerMethodField()
+
+    def get_filling(self, obj):
+        filling = obj.quantity + (obj.end - obj.start) * obj.bulk.tank_size / 100
+        return round(filling, 2)
+
+    def get_region(self, obj):
+        site = obj.bulk.asset.site
+        return site.engineer.region if site.engineer else ''
 
     def get_date(self, obj):
         return str(obj.date)[:10]

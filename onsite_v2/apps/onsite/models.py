@@ -139,5 +139,5 @@ class MonthlyVariable(models.Model):
     id = models.AutoField(primary_key=True, verbose_name='数字id')
     apsa = models.ForeignKey(Apsa, on_delete='CASCADE', max_length=100, verbose_name='Apsa资产')
     variable = models.ForeignKey(Variable, on_delete='CASCADE', max_length=100, verbose_name='变量')
-    usage = models.CharField(max_length=20, verbose_name="用处")
+    usage = models.CharField(max_length=20, verbose_name="用处", default='')
     order = models.IntegerField(default=-1, verbose_name='显示顺序')

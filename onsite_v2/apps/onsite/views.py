@@ -1303,35 +1303,46 @@ class MonthlyVariableModelView(ModelViewSet):
         order_invoice: int = request.data.get('order_invoice')
         order_monthly: int = request.data.get('order_monthly')
 
-        old_usage = [x.usage for x in MonthlyVariable.objects.filter(variable=variable_id)]
+        old_usage = [x.usage for x in MonthlyVariable.objects.filter(variable=variable_id) if x.usage != '']
+        if not old_usage:
+            MonthlyVariable.objects.filter(variable=variable_id).delete()
 
         delete_item = [x for x in old_usage if x not in usage]
         update_item = [x for x in old_usage if x in usage]
-        create_item = [x for x in usage if x not in old_usage]
+        create_item = [x for x in usage if x not in old_usage if x != '']
 
         variable = Variable.objects.get(id=variable_id)
         apsa = Apsa.objects.get(id=apsa_id)
+
         # 保存数据
         try:
-            for usage in delete_item:
-                MonthlyVariable.objects.get(variable=variable_id, usage=usage).delete()
+            # 若为usage不选时，删除后必须重新创建一个usage为空的记录
+            if not usage:
+                MonthlyVariable.objects.filter(variable=variable).delete()
+                MonthlyVariable.objects.create(
+                    variable=variable,
+                    apsa=apsa
+                )
+            else:
+                for usage in delete_item:
+                    MonthlyVariable.objects.get(variable=variable_id, usage=usage).delete()
 
-            for usage in update_item:
-                m = MonthlyVariable.objects.get(variable=variable_id, usage=usage)
-                if usage == 'MONTHLY':
-                    m.order = order_monthly
-                elif usage == 'INVOICE':
-                    m.order = order_invoice
-                m.save()
-
-            for usage in create_item:
-                if not MonthlyVariable.objects.filter(variable=variable, apsa=apsa, usage=usage).count():
-                    m = MonthlyVariable.objects.create(variable=variable, apsa=apsa, usage=usage)
+                for usage in update_item:
+                    m = MonthlyVariable.objects.get(variable=variable_id, usage=usage)
                     if usage == 'MONTHLY':
                         m.order = order_monthly
                     elif usage == 'INVOICE':
                         m.order = order_invoice
                     m.save()
+
+                for usage in create_item:
+                    if not MonthlyVariable.objects.filter(variable=variable, apsa=apsa, usage=usage).count():
+                        m = MonthlyVariable.objects.create(variable=variable, apsa=apsa, usage=usage)
+                        if usage == 'MONTHLY':
+                            m.order = order_monthly
+                        elif usage == 'INVOICE':
+                            m.order = order_invoice
+                        m.save()
 
         except DatabaseError as e:
             return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
@@ -1345,25 +1356,32 @@ class MonthlyVariableModelView(ModelViewSet):
             usage: list[str] = request.data.get('usage')
             order_invoice: int = request.data.get('order_invoice')
             order_monthly: int = request.data.get('order_monthly')
-            if not all([apsa, variable, usage]):
-                raise
             apsa_obj = Apsa.objects.get(id=apsa)
             variable_obj = Variable.objects.get(id=variable)
         except Exception:
             return Response("参数错误", status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            for u in usage:
-                if not MonthlyVariable.objects.filter(variable=variable, usage=u).count():
+            if usage:
+                MonthlyVariable.objects.filter(variable=variable).delete()
+                for u in usage:
+                    if not MonthlyVariable.objects.filter(variable=variable, usage=u).count():
+                        m = MonthlyVariable.objects.create(
+                            apsa=apsa_obj,
+                            variable=variable_obj,
+                            usage=u.upper()
+                        )
+                        if u == 'MONTHLY':
+                            m.order = order_monthly
+                        elif u == 'INVOICE':
+                            m.order = order_invoice
+                        m.save()
+            else:
+                if not MonthlyVariable.objects.filter(variable=variable).count():
                     m = MonthlyVariable.objects.create(
                         apsa=apsa_obj,
                         variable=variable_obj,
-                        usage=u.upper()
                     )
-                    if u == 'MONTHLY':
-                        m.order = order_monthly
-                    elif u == 'INVOICE':
-                        m.order = order_invoice
                     m.save()
         except Exception:
             return Response("内部错误", status=status.HTTP_400_BAD_REQUEST)

@@ -614,16 +614,16 @@ class RecordData(View):
             self.variables += variables
 
         total = len(self.variables)
-        print(f"共:{total}个变量,预计{int(total/11.6)}条记录")
+        print(f"共:{total}个变量,预计{int(total*11.6)}条记录")
         # 分发任务至子线程
-        multi_thread_task(multi_num=8, target_task=self.refresh_sub, task_args=(self.variables, h))
+        multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.variables, h))
         # 更新job状态
         jobs.update('IOT_RECORD', 'OK')
 
     def refresh_sub(self, variables, h):
         # 设置超时时间
         time_now = time.time()
-        max_duration = 60 * 10  # secs
+        max_duration = 60 * 14.5  # secs
 
         # 设置重试列表
         error = 0
@@ -647,6 +647,10 @@ class RecordData(View):
             result='starting,e'
         )
 
+        # 创建数据库列表
+        update_list = []
+        create_list = []
+
         # 循环任务
         while len(variables_list) != 0 and (time.time() - time_now < max_duration):
             length = len(variables_list)
@@ -655,9 +659,14 @@ class RecordData(View):
                   f'timeseries?start={self.start}&end={self.end}&limit={50000}'
             # 删除此变量，若报错则重新添加
             variables_list.remove(variable)
+
+            # 节省数据库查询量
+            first_v = 1
+            new = 0
             # 获取数据
             try:
-                res = requests.get(url, headers=h, timeout=5)
+                is_existed = 0
+                res = requests.get(url, headers=h, timeout=3)
                 if res.status_code == 401:
                     return
                 if res.status_code == 403:
@@ -677,13 +686,26 @@ class RecordData(View):
                             # 非level，只要零点的
                             pass
                         else:
-                            Record.objects.update_or_create(
-                                variable=variable, time=t,
-                                defaults={
-                                    'time': t,
-                                    'value': round(value, 2)
-                                }
+                            r = Record(
+                                variable=variable,
+                                time=t,
+                                value=round(value, 2)
                             )
+                            # 根据是否是第一条记录和是否存在进行分类
+                            if first_v:
+                                if Record.objects.filter(variable=variable, time=t).count() == 0:
+                                    new = 1
+                                    create_list.append(r)
+                                else:
+                                    new = 0
+                                    update_list.append(r)
+                                first_v = 0
+                            else:
+                                if new:
+                                    create_list.append(r)
+                                else:
+                                    update_list.append(r)
+
                     second_part = job.result.split(",")[1]
                     job.result = f'done:{ori_len - length}/{ori_len},' + second_part
                     job.save()
@@ -705,6 +727,11 @@ class RecordData(View):
 
         # 任务结束,判断结束条件
         if len(variables_list) != 0:
+            # 更新内容
+            Record.objects.bulk_update(update_list, ['value'])
+            # 新建内容
+            Record.objects.bulk_create(create_list, batch_size=100)
+
             job.result = 'Error:TimeOut,' + job.result
             job.finish_time = datetime.now()
             job.save()

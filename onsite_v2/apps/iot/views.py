@@ -1028,16 +1028,12 @@ class AssetModelView(UpdateListRetrieveViewSet):
                 apsa_id_list = [x.asset_id for x in Apsa.objects.all()]
                 if cal == '1':
                     apsa_id_list = [x.asset_id for x in Apsa.objects.filter(daily_js__gte=1)]
-                elif cal == '0':
-                    apsa_id_list = [x.asset_id for x in Apsa.objects.filter(daily_js=0)]
                 queryset = queryset.filter(id__in=apsa_id_list)
             elif apsa == '0':
                 self.apsa = 0
                 bulk_id_list = [x.asset_id for x in Bulk.objects.all()]
                 if cal == '1':
                     bulk_id_list = [x.asset_id for x in Bulk.objects.filter(filling_js__gte=1)]
-                elif cal == '0':
-                    bulk_id_list = [x.asset_id for x in Bulk.objects.filter(filling_js=0)]
                 queryset = queryset.filter(id__in=bulk_id_list)
 
         return queryset
@@ -1312,9 +1308,12 @@ class RefreshAllAsset(APIView):
 
 class KillRecordTaskView(View):
     def get(self, request):
-        jobs = AsyncJob.objects.filter(name__contains='RECORD', finish_time=None)
-        for job in jobs:
+        sub_jobs = AsyncJob.objects.filter(name__contains='SUB_RECORD')
+        for j in sub_jobs:
+            j.delete()
+        main_jobs = AsyncJob.objects.filter(name__contains='RECORD', finish_time=None)
+        for job in main_jobs:
             job.result = 'ERROR: killed by api request'
             job.finish_time = datetime.now()
             job.save()
-        return JsonResponse({"status": 200, 'msg': 'ok', 'affected rows': len(jobs)})
+        return JsonResponse({"status": 200, 'msg': 'ok', 'affected rows': len(sub_jobs+1)})

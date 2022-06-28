@@ -514,7 +514,7 @@ class FillMonthlyCalculate(APIView):
                 ])
 
                 # 公式计算汇总记录(液态立方米) f = 始末液位*容积(M3) + 月度充液量(M3)
-                quantity = (l_start - l_end) * bulk.tank_size / 100 + f_quantity / 1000
+                quantity = f_quantity / 1000
 
                 # 数据库保存或更新
                 FillingMonthly.objects.update_or_create(
@@ -736,7 +736,7 @@ class FillingModelView(ModelViewSet):
 
 class FillingMonthlyView(ListUpdateViewSet):
     # 查询集
-    queryset = FillingMonthly.objects.order_by('bulk__asset__site__engineer_region')
+    queryset = FillingMonthly.objects.all()
     # 序列化器
     serializer_class = FillingMonthlySerializer
     # 指定分页器
@@ -751,17 +751,35 @@ class FillingMonthlyView(ListUpdateViewSet):
         region = query.get('region')
         self.aggr = query.get('aggr')
 
-        if region:
-            self.queryset = self.queryset.filter(bulk__asset__site__engineer__region=region)
-
         if date:
             self.queryset = self.queryset.filter(date=date + '-21')
+
+        if region:
+            self.queryset = self.queryset.filter(bulk__asset__site__engineer__region=region)
 
         return self.queryset
 
     def list(self, request):
         queryset = self.get_queryset()
+        # ordered_queryset = {}
+        # for q in self.get_queryset():
+        #     if e := q.bulk.asset.site.engineer:
+        #         region = e.region
+        #     else:
+        #         region = '11'
+        #     ordered_queryset[region+q.bulk.asset.rtu_name] = q
+        #
+        # queryset = []
+        # keys = sorted([i for i in ordered_queryset.keys()])
+        #
+        # for x in keys:
+        #     queryset.append(ordered_queryset[x])
+        #
+        # for x in queryset:
+        #     print(x.bulk.asset.rtu_name)
+
         sites = [x['bulk__asset__rtu_name'] for x in queryset.values('bulk__asset__rtu_name').distinct()]
+
         page_sites = self.paginate_queryset(sites)
 
         if page_sites is not None:
@@ -774,40 +792,29 @@ class FillingMonthlyView(ListUpdateViewSet):
                 rsp = serializer.data
 
             return self.get_paginated_response(rsp)
-            # if self.aggr:
-            #     rsp = []
-            #     for site in page:
-            #         rtu_name = site['bulk__asset__rtu_name']
-            #         quantity = 0
-            #         date = ''
-            #         for i in FillingMonthly.objects.filter(bulk__asset__rtu_name=rtu_name):
-            #             date = i.date
-            #             quantity += i.quantity
-            #         rsp.append({
-            #             "date": date.strftime('%Y-%m-%d'),
-            #             "rtu_name": rtu_name,
-            #             "quantity": round(quantity, 2)
-            #         })
-            #     return self.get_paginated_response(rsp)
-            # serializer = self.get_serializer(page, many=True)
-            # return self.get_paginated_response(serializer.data)
+
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
     def aggregate(self, sites, q):
         rsp = []
-        quantity = 0
-        date = ''
         for site in sites:
+            engineer = None
+            total = 0
+            date = ''
+
             for i in q.filter(bulk__asset__rtu_name=site):
+                lin_bulk = (i.start - i.end) * i.bulk.tank_size / 100
                 date = i.date
-                quantity += i.quantity
+                total += i.quantity + lin_bulk
+                engineer = i.bulk.asset.site.engineer
+
             rsp.append({
-                        "date": date.strftime('%Y-%m-%d'),
-                        "rtu_name": site,
-                        "filling": 0,
-                        "quantity": round(quantity, 2)
-                    })
+                "date": date.strftime('%Y-%m-%d'),
+                "region": engineer.region if engineer else '',
+                "rtu_name": site,
+                "total": round(total, 2)
+            })
         return rsp
 
 

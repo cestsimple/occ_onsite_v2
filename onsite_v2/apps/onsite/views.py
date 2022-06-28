@@ -251,7 +251,7 @@ class DailyCalculate(View):
                         self.get_lin_tot_complex()
                     else:
                         self.error = 1
-                        self.error_variables.append('m3出现负数')
+                        self.error_variables.append('M3出现负数')
 
                 # 若有停机写入停机
                 self.generate_malfunction()

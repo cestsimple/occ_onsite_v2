@@ -605,6 +605,12 @@ class RecordData(View):
         # 如果是部分请求，则过滤
         self.partially_filter()
 
+        # 设定查询时间
+        self.set_time()
+
+        # 删除已有记录保证所有记录都只做插入操作
+        self.delete_old_records()
+
         # 获取assets对应变量,去除没有dailymark的
         for asset in self.assets:
             # 获取所有daily和monthly变量去重
@@ -631,15 +637,6 @@ class RecordData(View):
         variables_list = [Variable.objects.get(id=x) for x in variables]
         ori_len = len(variables_list)
 
-        # 设定查询时间
-        self.set_time()
-
-        # 设定daily_mark_list
-        daily_mark_list = [
-            'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
-            'H_STPDFT', 'H_STP400V', 'M3_PEAK',
-        ]
-
         # 创建子线程job以便监控
         job = AsyncJob.objects.create(
             name=f'SUB_RECORD_{threading.get_ident()}',
@@ -647,8 +644,7 @@ class RecordData(View):
             result='starting,e'
         )
 
-        # 创建数据库列表
-        update_list = []
+        # 创建列表
         create_list = []
 
         # 循环任务
@@ -660,18 +656,15 @@ class RecordData(View):
             # 删除此变量，若报错则重新添加
             variables_list.remove(variable)
 
-            # 节省数据库查询量
-            first_v = 1
-            new = 0
             # 获取数据
             try:
-                is_existed = 0
                 res = requests.get(url, headers=h, timeout=3)
                 if res.status_code == 401:
                     return
                 if res.status_code == 403:
                     pass
                 else:
+                    time_keys = []
                     res = res.json()['timeseries']
                     for i in res.keys():
                         # 时间转化
@@ -686,25 +679,13 @@ class RecordData(View):
                             # 非level，只要零点的
                             pass
                         else:
-                            r = Record(
-                                variable=variable,
-                                time=t,
-                                value=round(value, 2)
-                            )
-                            # 根据是否是第一条记录和是否存在进行分类
-                            if first_v:
-                                if Record.objects.filter(variable=variable, time=t).count() == 0:
-                                    new = 1
-                                    create_list.append(r)
-                                else:
-                                    new = 0
-                                    update_list.append(r)
-                                first_v = 0
-                            else:
-                                if new:
-                                    create_list.append(r)
-                                else:
-                                    update_list.append(r)
+                            if t not in time_keys:
+                                create_list.append(Record(
+                                    variable=variable,
+                                    time=t,
+                                    value=round(value, 2)
+                                ))
+                                time_keys.append(t)
 
                     second_part = job.result.split(",")[1]
                     job.result = f'done:{ori_len - length}/{ori_len},' + second_part
@@ -727,15 +708,12 @@ class RecordData(View):
 
         # 任务结束,判断结束条件
         if len(variables_list) != 0:
-            # 更新内容
-            Record.objects.bulk_update(update_list, ['value'])
-            # 新建内容
-            Record.objects.bulk_create(create_list, batch_size=100)
-
             job.result = 'Error:TimeOut,' + job.result
             job.finish_time = datetime.now()
             job.save()
         else:
+            # 新建数据
+            Record.objects.bulk_create(create_list, batch_size=100)
             job.delete()
 
     def set_time(self):
@@ -743,12 +721,12 @@ class RecordData(View):
             # 设定默认查询时间
             t = datetime.now()
             # IOT系统时间未UTC，会把我们的时间+8返回
-            self.start = (t + timedelta(days=-2)).strftime("%Y-%m-%d") + 'T15:00:00.000Z'
-            self.end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T17:00:00.000Z'
+            self.start = (t + timedelta(days=-2)).strftime("%Y-%m-%d") + 'T15:55:00.000Z'
+            self.end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T16:05:00.000Z'
         else:
             self.start = (datetime.strptime(self.time_list[0], "%Y-%m-%d") + timedelta(days=-1)).strftime(
                 "%Y-%m-%d") + 'T15:00:00.000Z'
-            self.end = self.time_list[0] + 'T17:00:00.000Z'
+            self.end = self.time_list[1] + 'T17:00:00.000Z'
 
     def partially_filter(self):
         # 如果传入了apsa_id则过滤,否则跳过
@@ -764,10 +742,12 @@ class RecordData(View):
                 ]
             self.assets = self.assets.filter(id__in=asset_id_list)
 
-
-class ManuelAllData(View):
-    def get(self, request):
-        pass
+    def delete_old_records(self):
+        end = (datetime.strptime(self.time_list[1], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        time_range = [self.time_list[0], end]
+        records = Record.objects.filter(time__range=time_range)
+        if records.count() != 0:
+            records.delete()
 
 
 class DeleteSiteDup(View):

@@ -622,7 +622,7 @@ class RecordData(View):
         total = len(self.variables)
         print(f"共:{total}个变量,预计{int(total*11.6)}条记录")
         # 分发任务至子线程
-        multi_thread_task(multi_num=10, target_task=self.refresh_sub, task_args=(self.variables, h))
+        multi_thread_task(multi_num=12, target_task=self.refresh_sub, task_args=(self.variables, h))
         # 更新job状态
         jobs.update('IOT_RECORD', 'OK')
 
@@ -721,12 +721,14 @@ class RecordData(View):
             # 设定默认查询时间
             t = datetime.now()
             # IOT系统时间未UTC，会把我们的时间+8返回
+            yesterday = (t + timedelta(days=-1)).strftime("%Y-%m-%d")
             self.start = (t + timedelta(days=-2)).strftime("%Y-%m-%d") + 'T15:55:00.000Z'
-            self.end = (t + timedelta(days=-1)).strftime("%Y-%m-%d") + 'T16:05:00.000Z'
+            self.end =  yesterday + 'T16:05:00.000Z'
+            self.time_list = [yesterday, yesterday]
         else:
             self.start = (datetime.strptime(self.time_list[0], "%Y-%m-%d") + timedelta(days=-1)).strftime(
-                "%Y-%m-%d") + 'T15:00:00.000Z'
-            self.end = self.time_list[1] + 'T17:00:00.000Z'
+                "%Y-%m-%d") + 'T15:55:00.000Z'
+            self.end = self.time_list[1] + 'T16:05:00.000Z'
 
     def partially_filter(self):
         # 如果传入了apsa_id则过滤,否则跳过

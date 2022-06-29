@@ -408,38 +408,42 @@ class DailyCalculate(View):
         """生成停机Malfunction"""
         d_res = self.daily_res
 
-        if d_res['h_stpal'] or d_res['h_stpdft'] or d_res['h_stp400v']:
-            if d_res['h_stpal']:
-                default = {
-                    'stop_label': 'AL',
-                    'stop_consumption': d_res['m3_q6'],
-                    'stop_hour': d_res['h_stpal'],
-                }
-            elif d_res['h_stpdft']:
-                default = {
-                    'stop_label': 'DFT',
-                    'stop_consumption': d_res['m3_q6'],
-                    'stop_hour': d_res['h_stpdft'],
-                }
-            elif d_res['h_stp400v']:
-                default = {
-                    'stop_label': '400V',
-                    'stop_consumption': d_res['m3_q7'],
-                    'stop_hour': d_res['h_stp400v'],
-                }
-            # 添加停机信息
-            default['t_end'] = self.t_start
+        # 循环三次，判断三种停机是否出现
+        for i in range(3):
+            # 是否停机标志位
+            has_stoped = 0
 
-            # 判断是否存在且确认，是则跳过
-            m = Malfunction.objects.filter(apsa=self.apsa, t_start=self.t_start, stop_label=default['stop_label'])
-            if not (m.count() == 1 and m[0].confirm == 1):
-                # 生成或更新记录
-                default['change_date'] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                default['change_user'] = 'system'
-                Malfunction.objects.update_or_create(
-                    apsa=self.apsa, t_start=self.t_start, stop_label=default['stop_label'],
-                    defaults=default
-                )
+            # 获取停机时常信息
+            if i == 0 and d_res['h_stpal']:
+                has_stoped = 1
+                default = {'stop_label': 'AL',
+                           'stop_consumption': d_res['m3_q6'],
+                           'stop_hour': d_res['h_stpal']}
+            if i == 1 and d_res['h_stpdft']:
+                has_stoped = 1
+                default = {'stop_label': 'DFT',
+                           'stop_consumption': d_res['m3_q6'],
+                           'stop_hour': d_res['h_stpdft']}
+            if i == 2 and d_res['h_stp400v']:
+                has_stoped = 1
+                default = {'stop_label': '400V',
+                           'stop_consumption': d_res['m3_q7'],
+                           'stop_hour': d_res['h_stp400v']}
+
+            # 判断标志位创建停机记录
+            if has_stoped:
+                default['t_end'] = self.t_start
+
+                # 判断是否存在且确认，是则跳过
+                m = Malfunction.objects.filter(apsa=self.apsa, t_start=self.t_start, stop_label=default['stop_label'])
+                if not (m.count() == 1 and m[0].confirm == 1):
+                    # 生成或更新记录
+                    default['change_date'] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    default['change_user'] = 'system'
+                    Malfunction.objects.update_or_create(
+                        apsa=self.apsa, t_start=self.t_start, stop_label=default['stop_label'],
+                        defaults=default
+                    )
 
     def set_date(self):
         if not self.date_range:

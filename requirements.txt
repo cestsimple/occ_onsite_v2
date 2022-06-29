@@ -1,0 +1,8 @@
+django==2.2.18
+requests
+djangorestframework==3.13.1
+pycognito==2022.3.0
+pymysql==1.0.2
+django-mssql-backend==2.8.1
+django-cors-headers==2.2.0
+djangorestframework-jwt==1.11.0

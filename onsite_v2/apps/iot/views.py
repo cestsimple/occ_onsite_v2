@@ -747,7 +747,7 @@ class RecordData(View):
     def delete_old_records(self):
         end = (datetime.strptime(self.time_list[1], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
         time_range = [self.time_list[0], end]
-        records = Record.objects.filter(time__range=time_range)
+        records = Record.objects.filter(time__range=time_range, variable__asset__in=self.assets)
         if records.count() != 0:
             records.delete()
 

@@ -31,6 +31,9 @@ urlpatterns = [
     url(r'^malfunction/(?P<pk>\d+)/$',
         views.MalfunctionModelView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 
+    # malfunction 月报
+    url(r'^monthly/malfunction/$', views.MonthlyMalfunction.as_view({'get': 'list'})),
+
     # reason
     url(r'^malfunction/reason/$', views.ReasonModelView.as_view({'get': 'list'})),
     # reason-detail

@@ -1504,3 +1504,114 @@ class InvoiceDiffModelView(ModelViewSet):
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
+
+class MonthlyMalfunction(ModelViewSet):
+    # 查询集
+    queryset = Malfunction.objects.all()
+    # 序列化器
+    serializer_class = InvoiceDiffSerializer
+    # 指定分页器
+    pagination_class = PageNum
+    # 权限
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request):
+        query = self.request.query_params
+        region = query.get('region')
+        name = query.get('name')
+        t_start = query.getlist('date[]')[0] + " 00:00:00" if query.getlist('date[]') else ""
+        t_end = query.getlist('date[]')[1] + " 00:00:00" if query.getlist('date[]') else ""
+
+        # 若无时间参数则默认未前一天的一个月周期
+        if not t_start or not t_end:
+            yesterday = datetime.now() + timedelta(days=-1)
+            t_end = yesterday.strftime("%Y-%m-%d") + " 00:00:00"
+            t_start = (yesterday + relativedelta(months=-1)).strftime("%Y-%m-%d") + " 00:00:00"
+
+        # 条件过滤
+        queryset = Apsa.objects.all()
+        if region:
+            queryset = queryset.filter(asset__site__engineer__region=region)
+        if name:
+            name = name.strip().upper()
+            queryset = queryset.filter(
+                Q(asset__rtu_name__contains=name) | Q(asset__site__name__contains=name)
+            )
+        queryset = queryset.order_by('asset__site__engineer__region', 'asset__rtu_name')
+
+        page = self.paginate_queryset(queryset)
+
+        rsp = []
+
+        if page is not None:
+            for apsa in queryset:
+                # 初始化数据变量
+                """
+                Internal Involuntary Stop LIN Consumption: QII内部被动停机液氮消耗
+                Voluntary and Not Budget Stop LIN Consumption: QVNB主动无预算停机液氮消耗
+                Normal Maintenance Stop LIN Consumption : QN计划内保养停机液氮消耗
+                External Interruptions LIN Consumption:QEI外部原因((客户原因)停机液氮消耗
+                
+                Internal Involuntary Duration: TII内部被动停机总时间
+                Voluntary and Not Budget Duration: TVNB主动无预算停机总时间
+                Budget Maintenance Duration: TVB计划内保养停机总时间
+                External Interruptions Duration:TEI外部原因((客户原因)总停机时间
+                
+                Number of Internal Involuntary Interruptions: NII内部被动停机总次数
+                Number of Voluntary + Not Budget Interruptions: NVNB主动无预算停机总次数
+                Number of Budget Maintenance Interruptions: NVB计划内保养停机总次数
+                Number of External Interruptions: NEI外部原因((客户原因)总停机次数
+                """
+                rsp_data = {
+                    'qii': 0,
+                    'qvnb': 0,
+                    'qn': 0,
+                    'qei': 0,
+                    'tei': 0,
+                    'tii': 0,
+                    'tvnb': 0,
+                    'tvb': 0,
+                    'nei': 0,
+                    'nii': 0,
+                    'nvnb': 0,
+                    'nvb': 0
+                }
+
+                # 获取所有停机记录
+                records = Malfunction.objects.filter(t_start__range=[t_start, t_end], apsa=apsa)
+
+                # 循环记录，统计需要的数据
+                for r in records:
+                    # 添加序列化的相应
+                    if r.reason_main == 'Internal Involuntary Interruptions':
+                        rsp_data['nii'] += 1
+                        rsp_data['qii'] += r.stop_consumption
+                        rsp_data['tii'] += r.stop_hour
+
+                    elif r.reason_main == 'Voluntary + Not Budget Interruptions':
+                        rsp_data['nvnb'] += 1
+                        rsp_data['qvnb'] += r.stop_consumption
+                        rsp_data['tvnb'] += r.stop_hour
+
+                    elif r.reason_main == 'Budget Maintenance Interruptions':
+                        rsp_data['nvb'] += 1
+                        rsp_data['qn'] += r.stop_consumption
+                        rsp_data['tvb'] += r.stop_hour
+
+                    elif r.reason_main == 'Disuse by Customer' or r.reason_main == 'External Interruptions':
+                        rsp_data['nei'] += 1
+                        rsp_data['qei'] += r.stop_consumption
+                        rsp_data['tei'] += r.stop_hour
+
+                rsp.append({
+                    'apsa_id': apsa.id,
+                    'region': apsa.asset.site.engineer.region if apsa.asset.site.engineer else '',
+                    'rtu_name': apsa.asset.rtu_name,
+                    'date': t_end.split(' ')[0],
+                    **rsp_data
+                })
+
+            return Response(rsp)
+
+        return Response(rsp)

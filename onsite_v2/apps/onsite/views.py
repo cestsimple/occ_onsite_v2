@@ -1681,3 +1681,21 @@ class MonthlyMalfunction(ModelViewSet):
             return self.get_paginated_response(rsp)
 
         return Response(rsp)
+
+
+class MalfunctionLock(APIView):
+    def post(self, request):
+        data = request.data.get('id_list')
+        confirm = request.data.get('confirm')
+        if not all([data, confirm]):
+            return Response(status=400, data="参数错误")
+
+        try:
+            for id in data:
+                m = Malfunction.objects.get(id=id)
+                m.confirm = confirm
+                m.save()
+        except Exception as e:
+            return Response(status=500, data=f"数据库错误:{e}")
+
+        return Response(status=200, data="ok")

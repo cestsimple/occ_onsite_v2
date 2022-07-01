@@ -30,6 +30,7 @@ urlpatterns = [
     url(r'^malfunction/$', views.MalfunctionModelView.as_view({'get': 'list', 'post': 'create'})),
     url(r'^malfunction/(?P<pk>\d+)/$',
         views.MalfunctionModelView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
+    url(r'^malfunction/lock/', views.MalfunctionLock.as_view()),
 
     # malfunction 月报
     url(r'^monthly/malfunction/$', views.MonthlyMalfunction.as_view({'get': 'list'})),

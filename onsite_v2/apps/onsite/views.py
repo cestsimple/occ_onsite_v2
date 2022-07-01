@@ -1475,7 +1475,7 @@ class InvoiceDiffModelView(ModelViewSet):
             queryset = queryset.filter(
                 Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
             )
-        queryset = queryset.order_by('apsa_id', 'order')
+        queryset = queryset.order_by('apsa__asset__rtu_name', 'order')
         page = self.paginate_queryset(queryset)
 
         if page is not None:
@@ -1496,7 +1496,7 @@ class InvoiceDiffModelView(ModelViewSet):
                     l_end = 0
 
                 # H_PROD不需要计算差值，只要去截至值即可
-                if v.daily_mark == 'H_PROD':
+                if v.daily_mark == 'H_PROD' and usage == 'MONTHLY':
                     diff = l_end
                 else:
                     diff = round(l_end-l_start, 2)
@@ -1615,14 +1615,69 @@ class MonthlyMalfunction(ModelViewSet):
                         rsp_data['qei'] += r.stop_consumption
                         rsp_data['tei'] += r.stop_hour
 
+                rtu_name = apsa.asset.rtu_name.replace('CN_', '')
                 rsp.append({
-                    'apsa_id': apsa.id,
-                    'region': apsa.asset.site.engineer.region if apsa.asset.site.engineer else '',
-                    'rtu_name': apsa.asset.rtu_name,
-                    'date': t_end.split(' ')[0],
-                    **rsp_data
+                    "rtu_name": rtu_name,
+                    "date": t_end.split(' ')[0],
+                    "apsa": apsa.id,
+                    "item": "Internal Involuntary Stop LIN Consumption: QII内部被动停机液氮消耗",
+                    "value": rsp_data['qii']
                 })
-
-            return Response(rsp)
+                rsp.append({
+                    "rtu_name": rtu_name,
+                    "item": "Voluntary and Not Budget Stop LIN Consumption: QVNB主动无预算停机液氮消耗",
+                    "value": rsp_data['qvnb']
+                })
+                rsp.append({
+                    "rtu_name": rtu_name,
+                    "item": "Normal Maintenance Stop LIN Consumption : QN计划内保养停机液氮消耗",
+                    "value": rsp_data['qn']
+                })
+                rsp.append({
+                    "rtu_name": rtu_name,
+                    "item": "External Interruptions LIN Consumption:QEI外部原因((客户原因)停机液氮消耗",
+                    "value": rsp_data['qei']
+                })
+                rsp.append({
+                    "rtu_name": rtu_name,
+                    "item": "External Interruptions Duration:TEI外部原因((客户原因)总停机时间",
+                    "value": rsp_data['tei']
+                })
+                rsp.append({
+                    "rtu_name": rtu_name,
+                    "item": "Internal Involuntary Duration: TII内部被动停机总时间",
+                    "value": rsp_data['tii']
+                })
+                rsp.append({
+                    "rtu_name": rtu_name,
+                    "item": "Voluntary and Not Budget Duration: TVNB主动无预算停机总时间",
+                    "value": rsp_data['tvnb']
+                })
+                rsp.append({
+                    "rtu_name": rtu_name,
+                    "item": "Budget Maintenance Duration: TVB计划内保养停机总时间",
+                    "value": rsp_data['tvb']
+                })
+                rsp.append({
+                    "rtu_name": rtu_name,
+                    "item": "Number of External Interruptions: NEI外部原因((客户原因)总停机次数",
+                    "value": rsp_data['nei']
+                })
+                rsp.append({
+                    "rtu_name": rtu_name,
+                    "item": "Number of Internal Involuntary Interruptions: NII内部被动停机总次数",
+                    "value": rsp_data['nii']
+                })
+                rsp.append({
+                    "rtu_name": rtu_name,
+                    "item": "Number of Voluntary + Not Budget Interruptions: NVNB主动无预算停机总次数",
+                    "value": rsp_data['nvnb']
+                })
+                rsp.append({
+                    "rtu_name": rtu_name,
+                    "item": "Number of Budget Maintenance Interruptions: NVB计划内保养停机总次数",
+                    "value": rsp_data['nvb']
+                })
+            return self.get_paginated_response(rsp)
 
         return Response(rsp)

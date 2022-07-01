@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Filling, Daily, DailyMod, Malfunction, FillingMonthly, MonthlyVariable, InvoiceDiff
-from ..iot.models import Asset
+from ..iot.models import Asset, Apsa
 
 
 class FillingSerializer(serializers.ModelSerializer):
@@ -10,6 +10,15 @@ class FillingSerializer(serializers.ModelSerializer):
     asset_name = serializers.SerializerMethodField()
     rtu_name = serializers.SerializerMethodField()
     tank_size = serializers.SerializerMethodField()
+    nm3 = serializers.SerializerMethodField()
+
+    def get_nm3(self, obj):
+        rtu_name = obj.bulk.asset.rtu_name
+        try:
+            apsa = Apsa.objects.get(asset__rtu_name=rtu_name, asset__confirm=1)
+            return round(obj.quantity * 0.65 * (apsa.temperature + 273.15) / 273.15, 2)
+        except Exception as e:
+            return e[:100]
 
     def get_asset_name(self, obj):
         return Asset.objects.get(bulk=obj.bulk).name

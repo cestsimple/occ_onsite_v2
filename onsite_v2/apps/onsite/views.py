@@ -407,31 +407,42 @@ class DailyCalculate(View):
     def generate_malfunction(self):
         """生成停机Malfunction"""
         d_res = self.daily_res
+        has_al = 0
 
         # 循环三次，判断三种停机是否出现
         for i in range(3):
             # 是否停机标志位
-            has_stoped = 0
+            has_stopped = 0
 
             # 获取停机时常信息
             if i == 0 and d_res['h_stpal']:
-                has_stoped = 1
+                has_stopped = 1
+                has_al = 1
+                consumption = d_res['m3_q6']
                 default = {'stop_label': 'AL',
-                           'stop_consumption': d_res['m3_q6'],
+                           'stop_consumption': consumption,
                            'stop_hour': d_res['h_stpal']}
+
             if i == 1 and d_res['h_stpdft']:
-                has_stoped = 1
+                has_stopped = 1
+                # 如果已经记过AL则DFT的用液不计
+                if has_al:
+                    consumption = 0
+                else:
+                    consumption = d_res['m3_q6']
+
                 default = {'stop_label': 'DFT',
-                           'stop_consumption': d_res['m3_q6'],
+                           'stop_consumption': consumption,
                            'stop_hour': d_res['h_stpdft']}
+
             if i == 2 and d_res['h_stp400v']:
-                has_stoped = 1
+                has_stopped = 1
                 default = {'stop_label': '400V',
                            'stop_consumption': d_res['m3_q7'],
                            'stop_hour': d_res['h_stp400v']}
 
             # 判断标志位创建停机记录
-            if has_stoped:
+            if has_stopped:
                 default['t_end'] = self.t_start
 
                 # 判断是否存在且确认，是则跳过
@@ -1545,7 +1556,7 @@ class MonthlyMalfunction(ModelViewSet):
         rsp = []
 
         if page is not None:
-            for apsa in queryset:
+            for apsa in page:
                 # 初始化数据变量
                 """
                 Internal Involuntary Stop LIN Consumption: QII内部被动停机液氮消耗

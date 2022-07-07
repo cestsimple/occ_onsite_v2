@@ -367,6 +367,14 @@ class DailyCalculate(View):
         if not self.error:
             d_res['success'] = 1
 
+        # 若为从气站，且已有数据(重跑)，先恢复主气站lin_tot_mod
+        record = Daily.objects.filter(apsa=self.apsa, date=self.t_start)
+        if self.apsa.daily_js == 2 and record.count() == 1:
+            apsa = Apsa.objects.get(id=self.apsa.daily_bind)
+            bind_daily_mod = DailyMod.objects.get(apsa=apsa, date=self.t_start)
+            bind_daily_mod.lin_tot_mod += round(record[0].lin_tot, 2)
+            bind_daily_mod.save()
+
         # Daily写入数据库
         Daily.objects.update_or_create(
             apsa=self.apsa, date=self.t_start,
@@ -395,7 +403,7 @@ class DailyCalculate(View):
                 user='SYSTEM'
             )
 
-            # 若为从气站，需要创建第两条mod数据，更新主机的mod数据
+            # 若为从气站，需要创建第两条mod数据，更新主气站lin_tot_mod数据
             if self.apsa.daily_js == 2:
                 apsa = Apsa.objects.get(id=self.apsa.daily_bind)
                 bind_daily_mod = DailyMod.objects.get(apsa=apsa, date=self.t_start)

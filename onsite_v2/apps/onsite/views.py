@@ -1540,7 +1540,7 @@ class MonthlyMalfunction(ModelViewSet):
         region = query.get('region')
         name = query.get('name')
         t_start = query.getlist('date[]')[0] + " 00:00:00" if query.getlist('date[]') else ""
-        t_end = query.getlist('date[]')[1] + " 00:00:00" if query.getlist('date[]') else ""
+        t_end = query.getlist('date[]')[1] + " 23:59:59" if query.getlist('date[]') else ""
 
         # 若无时间参数则默认未前一天的一个月周期
         if not t_start or not t_end:
@@ -1629,62 +1629,62 @@ class MonthlyMalfunction(ModelViewSet):
                     "date": t_end.split(' ')[0],
                     "apsa": apsa.id,
                     "item": "Internal Involuntary Stop LIN Consumption: QII内部被动停机液氮消耗",
-                    "value": rsp_data['qii']
+                    "value": round(rsp_data['qii'], 2)
                 })
                 rsp.append({
                     "rtu_name": rtu_name,
                     "item": "Voluntary and Not Budget Stop LIN Consumption: QVNB主动无预算停机液氮消耗",
-                    "value": rsp_data['qvnb']
+                    "value": round(rsp_data['qvnb'], 2)
                 })
                 rsp.append({
                     "rtu_name": rtu_name,
                     "item": "Normal Maintenance Stop LIN Consumption : QN计划内保养停机液氮消耗",
-                    "value": rsp_data['qn']
+                    "value": round(rsp_data['qn'], 2)
                 })
                 rsp.append({
                     "rtu_name": rtu_name,
                     "item": "External Interruptions LIN Consumption:QEI外部原因((客户原因)停机液氮消耗",
-                    "value": rsp_data['qei']
+                    "value": round(rsp_data['qei'], 2)
                 })
                 rsp.append({
                     "rtu_name": rtu_name,
                     "item": "External Interruptions Duration:TEI外部原因((客户原因)总停机时间",
-                    "value": rsp_data['tei']
+                    "value": round(rsp_data['tei'], 2)
                 })
                 rsp.append({
                     "rtu_name": rtu_name,
                     "item": "Internal Involuntary Duration: TII内部被动停机总时间",
-                    "value": rsp_data['tii']
+                    "value": round(rsp_data['tii'], 2)
                 })
                 rsp.append({
                     "rtu_name": rtu_name,
                     "item": "Voluntary and Not Budget Duration: TVNB主动无预算停机总时间",
-                    "value": rsp_data['tvnb']
+                    "value": round(rsp_data['tvnb'], 2)
                 })
                 rsp.append({
                     "rtu_name": rtu_name,
                     "item": "Budget Maintenance Duration: TVB计划内保养停机总时间",
-                    "value": rsp_data['tvb']
+                    "value": round(rsp_data['tvb'], 2)
                 })
                 rsp.append({
                     "rtu_name": rtu_name,
                     "item": "Number of External Interruptions: NEI外部原因((客户原因)总停机次数",
-                    "value": rsp_data['nei']
+                    "value": round(rsp_data['nei'], 2)
                 })
                 rsp.append({
                     "rtu_name": rtu_name,
                     "item": "Number of Internal Involuntary Interruptions: NII内部被动停机总次数",
-                    "value": rsp_data['nii']
+                    "value": round(rsp_data['nii'], 2)
                 })
                 rsp.append({
                     "rtu_name": rtu_name,
                     "item": "Number of Voluntary + Not Budget Interruptions: NVNB主动无预算停机总次数",
-                    "value": rsp_data['nvnb']
+                    "value": round(rsp_data['nvnb'], 2)
                 })
                 rsp.append({
                     "rtu_name": rtu_name,
                     "item": "Number of Budget Maintenance Interruptions: NVB计划内保养停机总次数",
-                    "value": rsp_data['nvb']
+                    "value": round(rsp_data['nvb'], 2)
                 })
             return self.get_paginated_response(rsp)
 

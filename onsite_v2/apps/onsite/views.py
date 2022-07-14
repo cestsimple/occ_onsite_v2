@@ -1549,7 +1549,7 @@ class MonthlyMalfunction(ModelViewSet):
             t_start = (yesterday + relativedelta(months=-1)).strftime("%Y-%m-%d") + " 00:00:00"
 
         # 条件过滤
-        queryset = Apsa.objects.all()
+        queryset = Apsa.objects.filter(daily_js__gte=1)
         if region:
             queryset = queryset.filter(asset__site__engineer__region=region)
         if name:

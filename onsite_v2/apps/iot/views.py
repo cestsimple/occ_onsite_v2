@@ -164,7 +164,7 @@ class SiteData(View):
 
         # 批量写入数据库
         try:
-            Site.objects.bulk_create(list_create)
+            Site.objects.bulk_create(list_create, batch_size=10)
             Site.objects.bulk_update(list_update, fields=['name'])
         except Exception as e:
             print(e)
@@ -262,8 +262,8 @@ class AssetData(View):
 
         # 批量写入数据库
         try:
-            Asset.objects.bulk_create(list_create)
-            Asset.objects.bulk_update(list_update, fields=['name', 'site', 'status', 'variables_num'])
+            Asset.objects.bulk_create(list_create, batch_size=20)
+            Asset.objects.bulk_update(list_update, batch_size=20, fields=['name', 'site', 'status', 'variables_num'])
         except Exception as e:
             print(e)
             jobs.update('IOT_ASSET', e)
@@ -383,8 +383,8 @@ class TagData(View):
                     bulk_list.append(b)
 
         # 写入数据库
-        Apsa.objects.bulk_create(apsa_list)
-        Bulk.objects.bulk_create(bulk_list)
+        Apsa.objects.bulk_create(apsa_list, batch_size=10)
+        Bulk.objects.bulk_create(bulk_list, batch_size=10)
 
         apsa_result: str = ""
         if apsa_list:
@@ -1265,7 +1265,7 @@ class RefreshAllAsset(APIView):
         # 获取当前时间，设定任务最大时间
         time_now = datetime.now()
         t_start = int(time.time())
-        max_duration = 60 * 60  # secs
+        max_duration = 15 * 60  # secs
 
         # 创建任务实例
         site = SiteData()

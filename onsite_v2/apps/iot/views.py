@@ -1037,12 +1037,16 @@ class AssetModelView(UpdateListRetrieveViewSet):
                 apsa_id_list = [x.asset_id for x in Apsa.objects.all()]
                 if cal == '1':
                     apsa_id_list = [x.asset_id for x in Apsa.objects.filter(daily_js__gte=1)]
+                if cal == '0':
+                    apsa_id_list = [x.asset_id for x in Apsa.objects.filter(daily_js=0)]
                 queryset = queryset.filter(id__in=apsa_id_list)
             elif apsa == '0':
                 self.apsa = 0
                 bulk_id_list = [x.asset_id for x in Bulk.objects.all()]
                 if cal == '1':
                     bulk_id_list = [x.asset_id for x in Bulk.objects.filter(filling_js__gte=1)]
+                if cal == '0':
+                    bulk_id_list = [x.asset_id for x in Bulk.objects.filter(filling_js=0)]
                 queryset = queryset.filter(id__in=bulk_id_list)
 
         return queryset

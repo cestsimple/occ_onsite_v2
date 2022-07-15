@@ -1131,8 +1131,8 @@ class DailyLintotView(View):
                 "tank_size": bulk.tank_size,
                 "l1": round(l_0, 2),
                 "l2": round(l_1, 2),
-                "lin_bulk": round(lin_bulk, 2),
-                "filling_quantity": round(filling_quantity, 2),
+                "lin_bulk": round(lin_bulk / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2),
+                "filling_quantity": round(filling_quantity / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2),
                 "lin_tot": round((filling_quantity + lin_bulk) / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2)
             })
 

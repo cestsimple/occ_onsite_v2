@@ -442,6 +442,9 @@ class TagData(View):
                 engineer = User.objects.filter(first_name=engineer_name)
                 if engineer.count() == 1:
                     site.engineer = engineer[0]
+                elif engineer.count() == 2:
+                    if engineer[0].first_name == engineer[1].first_name:
+                        site.engineer = engineer[1]
                 else:
                     site.engineer = User.objects.get(first_name='其他维修')
                 site.save()

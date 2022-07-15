@@ -25,6 +25,8 @@ urlpatterns = [
     url(r'^daily/mod/(?P<pk>\d+)/$', views.DailyModModelView.as_view({'get': 'retrieve', 'put': 'update'})),
     # daily_origin
     url(r'^daily/origin/(?P<pk>\d+)/$', views.DailyOriginView.as_view()),
+    # daily_lintot
+    url(r'^daily/lintot/(?P<pk>\d+)/$', views.DailyLintotView.as_view()),
 
     # malfunction
     url(r'^malfunction/$', views.MalfunctionModelView.as_view({'get': 'list', 'post': 'create'})),

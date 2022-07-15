@@ -1092,6 +1092,53 @@ class DailyOriginView(View):
         })
 
 
+class DailyLintotView(View):
+    def get(self, request, pk):
+        rsp = []
+        daily = Daily.objects.get(id=pk)
+        apsa = daily.apsa
+        if apsa.daily_js == 0:
+            return JsonResponse([{
+                "error": 1,
+                "msg": "该APSA不计算daily"
+            }], safe=False)
+        elif apsa.daily_js == 2:
+            main_apsa = Apsa.objects.get(id=apsa.daily_bind)
+            return JsonResponse([{
+                "error": 1,
+                "msg": f"该APSA从属于{main_apsa.asset.rtu_name}，LINTOT为固定值"
+            }], safe=False)
+        t_start = daily.date
+        t_end = (t_start + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+        bulks = Bulk.objects.filter(asset__site=apsa.asset.site, filling_js=1)
+        for bulk in bulks:
+            filling_quantity = sum([
+                x.quantity for x in Filling.objects.filter(bulk=bulk, time_1__range=[t_start, t_end])
+            ])
+            # 计算储罐首尾液位差量
+            variable = Variable.objects.get(asset=bulk.asset, daily_mark='LEVEL')
+            try:
+                l_0 = Record.objects.filter(variable=variable).get(time=t_start).value
+                l_1 = Record.objects.filter(variable=variable).get(time=t_end).value
+                lin_bulk = (l_0 - l_1) / 100 * bulk.tank_size * 1000  # 单位:升(液态)
+            except Exception as e:
+                print(e)
+                l_0 = l_1 = lin_bulk = 0
+
+            rsp.append({
+                "bulk_id": bulk.id,
+                "bulk_name": bulk.asset.name,
+                "tank_size": bulk.tank_size,
+                "l1": round(l_0, 2),
+                "l2": round(l_1, 2),
+                "lin_bulk": round(lin_bulk, 2),
+                "filling_quantity": round(filling_quantity, 2),
+                "lin_tot": round((filling_quantity + lin_bulk) / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2)
+            })
+
+        return JsonResponse(rsp, safe=False)
+
+
 class MalfunctionModelView(ModelViewSet):
     # 查询集
     queryset = Malfunction.objects.order_by('confirm', 'apsa__asset__site__engineer__region', 'apsa__onsite_series',

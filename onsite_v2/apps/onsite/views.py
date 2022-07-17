@@ -1118,8 +1118,8 @@ class DailyLintotView(View):
             # 计算储罐首尾液位差量
             variable = Variable.objects.get(asset=bulk.asset, daily_mark='LEVEL')
             try:
-                l_0 = Record.objects.filter(variable=variable).get(time=t_start).value
-                l_1 = Record.objects.filter(variable=variable).get(time=t_end).value
+                l_0 = Record.objects.get(variable=variable, time=t_start).value
+                l_1 = Record.objects.get(variable=variable, time=t_end).value
                 lin_bulk = (l_0 - l_1) / 100 * bulk.tank_size * 1000  # 单位:升(液态)
             except Exception as e:
                 print(e)

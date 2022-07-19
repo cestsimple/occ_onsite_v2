@@ -496,10 +496,9 @@ class FillMonthlyCalculate(APIView):
 
         # 设置时间
         try:
-            # day = int(start.split('-')[-1])
-            month = datetime.today().month
-            year = datetime.today().year
-            self.end = datetime(year, month, 21)
+            month = start.split('-')[1]
+            year = start.split('-')[0]
+            self.end = datetime(int(year), int(month), 21)
             self.start = self.end + relativedelta(months=-1)
         except Exception:
             jobs.update('ONSITE_FILLING_MONTHLY', 'ERROR: QueryDateSetError')
@@ -784,22 +783,6 @@ class FillingMonthlyView(ListUpdateViewSet):
 
     def list(self, request):
         queryset = self.get_queryset()
-        # ordered_queryset = {}
-        # for q in self.get_queryset():
-        #     if e := q.bulk.asset.site.engineer:
-        #         region = e.region
-        #     else:
-        #         region = '11'
-        #     ordered_queryset[region+q.bulk.asset.rtu_name] = q
-        #
-        # queryset = []
-        # keys = sorted([i for i in ordered_queryset.keys()])
-        #
-        # for x in keys:
-        #     queryset.append(ordered_queryset[x])
-        #
-        # for x in queryset:
-        #     print(x.bulk.asset.rtu_name)
 
         sites = [x['bulk__asset__rtu_name'] for x in queryset.values('bulk__asset__rtu_name').distinct()]
 

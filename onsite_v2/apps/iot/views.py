@@ -1264,8 +1264,7 @@ class RefreshAllAsset(APIView):
         if jobs.check('IOT_SITE', silent=True) or \
                 jobs.check('IOT_ASSET', silent=True) or \
                 jobs.check('IOT_TAG', silent=True) or \
-                jobs.check('IOT_VARIABLE', silent=True) or \
-                jobs.check('IOT_ALL'):
+                jobs.check('IOT_VARIABLE', silent=True):
             return Response('任务已存在', status=400)
 
         threading.Thread(target=self.sub, args=(request,)).start()

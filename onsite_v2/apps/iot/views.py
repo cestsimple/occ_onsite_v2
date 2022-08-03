@@ -598,7 +598,7 @@ class RecordData(View):
         else:
             params = "apsa_list=all"
         if self.time_list:
-            params += f" & time_list={'-'.join(self.time_list)}"
+            params += f" & time_list={' '.join(self.time_list)}"
         else:
             params += f" & time=yesterday"
 

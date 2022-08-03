@@ -2,7 +2,7 @@ from apps.iot.models import AsyncJob
 from datetime import datetime, timedelta
 
 
-def check(name, silent: bool = False):
+def check(name, silent: bool = False, user: str = '', params: str = ''):
     """检查job是否存在，存在返回1，不存在返回0并创建"""
     job = AsyncJob.objects.filter(name=name).order_by('-start_time')
     if job:
@@ -14,6 +14,8 @@ def check(name, silent: bool = False):
     if not silent:
         job = AsyncJob.objects.create(
             name=name,
+            user=user,
+            params=params,
             start_time=datetime.now(),
         )
     return 0

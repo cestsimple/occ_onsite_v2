@@ -590,9 +590,20 @@ class RecordData(View):
         # 获取部分刷新列表
         self.apsa_list = request.GET.getlist('apsa_list[]', [])
         self.time_list = request.GET.getlist('time_list[]', [])
+        user = request.GET.get('user')
+        params = ''
+
+        if self.apsa_list:
+            params = f"apsa_list={','.join(self.apsa_list)}"
+        else:
+            params = "apsa_list=all"
+        if self.time_list:
+            params += f" & time_list={'-'.join(self.time_list)}"
+        else:
+            params += f" & time=yesterday"
 
         # 检查Job状态
-        if jobs.check('IOT_RECORD'):
+        if jobs.check('IOT_RECORD', user=user, params=params):
             return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
 
         # 创建子线程
@@ -1261,10 +1272,14 @@ class AsyncJobModelView(ModelViewSet):
 
 class RefreshAllAsset(APIView):
     def get(self, request):
+        user = request.GET.get('user')
+        params = request.GET.get('params')
+
         if jobs.check('IOT_SITE', silent=True) or \
                 jobs.check('IOT_ASSET', silent=True) or \
                 jobs.check('IOT_TAG', silent=True) or \
-                jobs.check('IOT_VARIABLE', silent=True):
+                jobs.check('IOT_VARIABLE', silent=True) or \
+                jobs.check('IOT_ALL', user=user, params=params):
             return Response('任务已存在', status=400)
 
         threading.Thread(target=self.sub, args=(request,)).start()

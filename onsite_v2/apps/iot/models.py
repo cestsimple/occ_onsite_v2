@@ -9,8 +9,8 @@ class AsyncJob(models.Model):
     result = models.CharField(max_length=1024, verbose_name='运行结果', default='')
     start_time = models.DateTimeField(null=False)
     finish_time = models.DateTimeField(null=True)
-    # params = models.CharField(max_length=500, default="", verbose_name="具体参数")
-    # user = models.CharField(max_length=50, default="", verbose_name="用户名")
+    params = models.CharField(max_length=500, default="", verbose_name="具体参数")
+    user = models.CharField(max_length=50, default="", verbose_name="用户名")
     is_deleted = models.BooleanField(default=False)
 
 

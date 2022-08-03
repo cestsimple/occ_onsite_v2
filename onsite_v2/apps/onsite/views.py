@@ -33,9 +33,20 @@ class FillingCalculate(View):
         # 获取filling日期参数
         self.date_list = request.GET.getlist('date_list[]', [])
         self.apsa_list = request.GET.getlist('apsa_list[]', [])
+        user = request.GET.get('user')
+        params = ''
+
+        if self.apsa_list:
+            params = f"apsa_list={','.join(self.apsa_list)}"
+        else:
+            params = "apsa_list=all"
+        if self.date_list:
+            params += f" & date_list={' '.join(self.date_list)}"
+        else:
+            params += f" & date=yesterday"
 
         # 检查Job状态
-        if jobs.check('ONSITE_FILLING'):
+        if jobs.check('ONSITE_FILLING', user=user, params=params):
             return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
 
         # 创建子线程
@@ -204,9 +215,20 @@ class DailyCalculate(View):
         # 获取daily日期参数
         self.date_range = request.GET.getlist('date_list[]', [])
         self.apsa_list = request.GET.getlist('apsa_list[]', [])
+        user = request.GET.get('user')
+        params = ''
+
+        if self.apsa_list:
+            params = f"apsa_list={','.join(self.apsa_list)}"
+        else:
+            params = "apsa_list=all"
+        if self.date_range:
+            params += f" & date_list={' '.join(self.date_range)}"
+        else:
+            params += f" & date=yesterday"
 
         # 检查Job状态
-        if jobs.check('ONSITE_DAILY'):
+        if jobs.check('ONSITE_DAILY', user=user, params=params):
             return JsonResponse({'status': 400, 'msg': '任务正在进行中，请稍后刷新'})
 
         # 创建子线程
@@ -489,9 +511,11 @@ class FillMonthlyCalculate(APIView):
         query_params = request.GET
         start = query_params.get('start')
         self.region = query_params.get('region')
+        user = request.GET.get('user')
+        params = request.GET.get('params')
 
         # 检查Job状态
-        if jobs.check('ONSITE_FILLING_MONTHLY'):
+        if jobs.check('ONSITE_FILLING_MONTHLY', user=user, params=params):
             return Response('任务正在进行中，请稍后刷新', status=status.HTTP_400_BAD_REQUEST)
 
         # 设置时间
@@ -574,9 +598,11 @@ class InvoiceDiffCalculate(APIView):
         query_params = request.GET
         date = query_params.getlist('date[]')
         self.region = query_params.get('region')
+        user = request.GET.get('user')
+        params = request.GET.get('params')
 
         # 检查Job状态
-        if jobs.check('ONSITE_INVOICE_DIFF'):
+        if jobs.check('ONSITE_INVOICE_DIFF', user=user, params=params):
             return Response('任务正在进行中，请稍后刷新', status=status.HTTP_400_BAD_REQUEST)
 
         # 设置时间

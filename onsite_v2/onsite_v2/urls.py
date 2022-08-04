@@ -20,6 +20,7 @@ from django.views.generic import TemplateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    url(r'^api/', include(('apps.ludan.urls', 'ludan'), namespace='ludan')),
     url(r'^api/', include(('apps.iot.urls', 'iot'), namespace='iot')),
     url(r'^api/', include(('apps.user.urls', 'users'), namespace='users')),
     url(r'^api/', include(('apps.onsite.urls', 'onsite'), namespace='onsite')),

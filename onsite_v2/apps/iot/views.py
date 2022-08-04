@@ -309,7 +309,7 @@ class TagData(View):
         self.sort_asset()
 
         # 更新site工程师
-        # self.engineer_main()
+        self.engineer_main()
 
         # 更新job状态
         jobs.update('IOT_TAG', 'OK')

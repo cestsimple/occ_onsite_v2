@@ -166,7 +166,8 @@ STATIC_URL = '/static/'
 # 添加静态文件夹
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'frontend/dist'),
-    os.path.join(BASE_DIR, 'frontend/dist/static')
+    os.path.join(BASE_DIR, 'frontend/dist/static'),
+    os.path.join(BASE_DIR, 'static/'),
 ]
 
 

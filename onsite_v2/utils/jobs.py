@@ -12,6 +12,8 @@ def check(name, silent: bool = False, user: str = '', params: str = ''):
 
     # 添加Job状态
     if not silent:
+        if user is None:
+            user = 'System'
         job = AsyncJob.objects.create(
             name=name,
             user=user,

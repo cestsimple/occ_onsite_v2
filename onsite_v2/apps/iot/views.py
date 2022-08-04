@@ -309,7 +309,7 @@ class TagData(View):
         self.sort_asset()
 
         # 更新site工程师
-        self.engineer_main()
+        # self.engineer_main()
 
         # 更新job状态
         jobs.update('IOT_TAG', 'OK')
@@ -426,6 +426,7 @@ class TagData(View):
     def engineer_sub(self, sites, h):
         for site in sites:
             url = f'{URL}/sites/{site.uuid}/tags'
+            site_old_engineer = site.engineer
             try:
                 res = requests.get(url, headers=h).json()
 
@@ -443,16 +444,20 @@ class TagData(View):
                 if engineer.count() == 1:
                     site.engineer = engineer[0]
                 elif engineer.count() == 2:
+                    print(f"有重名:{engineer_name}")
                     if engineer[0].first_name == engineer[1].first_name:
                         if engineer[0].group:
                             site.engineer = engineer[0]
                         else:
                             site.engineer = engineer[1]
                 else:
-                    site.engineer = User.objects.get(first_name='其他维修')
+                    print(f"其他情况:{engineer_name}")
+                    if not site_old_engineer:
+                        site.engineer = User.objects.get(first_name='其他维修')
+
                 site.save()
             except Exception:
-                pass
+                print(engineer_name)
 
     def get_engineer_name(self, name):
         name = name.replace(' ', '')

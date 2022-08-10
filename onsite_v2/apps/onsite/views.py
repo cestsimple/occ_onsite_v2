@@ -512,7 +512,7 @@ class FillMonthlyCalculate(APIView):
         start = query_params.get('start')
         self.region = query_params.get('region')
         user = request.GET.get('user')
-        params = request.GET.get('params')
+        params = f"date:{start}, region:{self.region}"
 
         # 检查Job状态
         if jobs.check('ONSITE_FILLING_MONTHLY', user=user, params=params):
@@ -599,7 +599,7 @@ class InvoiceDiffCalculate(APIView):
         date = query_params.getlist('date[]')
         self.region = query_params.get('region')
         user = request.GET.get('user')
-        params = request.GET.get('params')
+        params = f"date:{date} & region:{self.region}"
 
         # 检查Job状态
         if jobs.check('ONSITE_INVOICE_DIFF', user=user, params=params):

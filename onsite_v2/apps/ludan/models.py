@@ -5,6 +5,8 @@ REGION_CHOICES = [
     ('cg', '成功'),
     ('skid', '小罐车'),
     ('med', '医用氧'),
+    ('kj', '科举'),
+    ('pag', '可燃气'),
 ]
 
 ACCOUNT_CHOICES = [

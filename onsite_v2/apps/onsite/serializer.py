@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Filling, Daily, DailyMod, Malfunction, FillingMonthly, MonthlyVariable, InvoiceDiff
+from .models import Filling, Daily, DailyMod, Malfunction, FillingMonthly, MonthlyVariable, InvoiceDiff, ReasonDetail
 from ..iot.models import Asset, Apsa
 
 
@@ -51,6 +51,28 @@ class MalfunctionSerializer(serializers.ModelSerializer):
     avg_con = serializers.SerializerMethodField()
     facility_fin = serializers.SerializerMethodField()
     region = serializers.SerializerMethodField()
+    reason_detail_1_eng = serializers.SerializerMethodField()
+    reason_detail_2_eng = serializers.SerializerMethodField()
+
+    def get_reason_detail_1_eng(self, obj):
+        cn_name = obj.reason_detail_1
+        if cn_name == "":
+            return ""
+        results = ReasonDetail.objects.filter(cname=cn_name)
+        if not results:
+            return "not found"
+        else:
+            return results[0].ename
+
+    def get_reason_detail_2_eng(self, obj):
+        cn_name = obj.reason_detail_2
+        if cn_name == "":
+            return ""
+        results = ReasonDetail.objects.filter(cname=cn_name)
+        if not results:
+            return "not found"
+        else:
+            return results[0].ename
 
     def get_asset_name(self, obj):
         return Asset.objects.get(apsa=obj.apsa).name

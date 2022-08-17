@@ -18,7 +18,7 @@ from .models import Filling, Daily, DailyMod, Malfunction, Reason, ReasonDetail,
     InvoiceDiff
 from .serializer import FillingSerializer, DailySerializer, DailyModSerializer, MalfunctionSerializer, \
     FillingMonthlySerializer, InvoiceVariableSerializer, InvoiceDiffSerializer
-from utils import jobs
+from utils import jobs, JResp
 from utils.pagination import PageNum
 
 
@@ -915,34 +915,58 @@ class DailyModelView(ListUpdateViewSet):
             self.queryset = self.queryset.filter(apsa__asset__site__engineer__group=group)
         if name:
             name = name.strip().upper()
-            self.queryset = self.queryset.filter(
-                Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
-            )
+            if "CN_" in name:
+                self.queryset = self.queryset.filter(
+                    Q(apsa__asset__rtu_name=name) | Q(apsa__asset__site__name=name)
+                )
+            else:
+                self.queryset = self.queryset.filter(
+                    Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
+                )
         if start and end:
-            start = start.replace('+', '')
-            end = end.replace('+', '')
+            start = start.replace('+', ' ')
+            end = end.replace('+', ' ')
             self.queryset = self.queryset.filter(date__range=[start, end])
-
         return self.queryset
 
     def list(self, request):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            res = self.generate_daily_data(serializer.data)
-            return self.get_paginated_response(res)
+        try:
+            queryset = self.filter_queryset(self.get_queryset())
+        except Exception as e:
+            print(e)
+            return JResp("查询参数错误", 400)
 
-        serializer = self.get_serializer(queryset, many=True)
-        res = self.generate_daily_data(serializer.data)
-        return Response(res)
+        try:
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                res = self.generate_daily_data(serializer.data)
+                return self.get_paginated_response(res)
+        except Exception as e:
+            print(e)
+            return JResp("分页失败", 400)
+
+        try:
+            serializer = self.get_serializer(queryset, many=True)
+            res = self.generate_daily_data(serializer.data)
+        except Exception:
+            return JResp("序列化Daily记录失败", 400)
+
+        return JResp(data=res)
 
     def update(self, request, pk):
-        daily = Daily.objects.get(id=pk)
-        daily.confirm = 1
-        daily.success = 1
-        daily.save()
-        return Response({'status': 200, 'msg': '修改Daily记录成功'})
+        try:
+            daily = Daily.objects.get(id=pk)
+        except Exception:
+            return JResp("记录查询失败", 400)
+
+        try:
+            daily.confirm = 1
+            daily.success = 1
+            daily.save()
+        except Exception:
+            return JResp("记录存储失败", 400)
+        return JResp()
 
     def generate_daily_data(self, daily_origin_list):
         res_list = []
@@ -1017,31 +1041,48 @@ class DailyModModelView(RetrieveUpdateViewSet):
     permission_classes = [IsAuthenticated]
 
     def update(self, request, pk):
-        daily_mod = DailyMod.objects.get(id=pk)
+        try:
+            daily_mod = DailyMod.objects.get(id=pk)
+        except Exception:
+            return JResp("查询记录失败", 400)
+
         apsa = daily_mod.apsa
         # 如果是从设备，需要联动更新LIN_TOT和主设备的LIN_TOT
-        if apsa.daily_js > 1:
-            # 获取旧数据
-            old_prod = daily_mod.m3_prod_mod
-            old_peak = daily_mod.m3_peak_mod
-            old_q6 = daily_mod.m3_q6_mod
-            old_q7 = daily_mod.m3_q7_mod
-            old_lin_tot = daily_mod.lin_tot_mod
+        try:
+            if apsa.daily_js > 1:
+                # 获取旧数据
+                old_prod = daily_mod.m3_prod_mod
+                old_peak = daily_mod.m3_peak_mod
+                old_q6 = daily_mod.m3_q6_mod
+                old_q7 = daily_mod.m3_q7_mod
+                old_lin_tot = daily_mod.lin_tot_mod
 
-            # 判断是否更新了q6, q7, peak, prod
-            if request.data.get('lin_tot_mod') == old_lin_tot:
-                if request.data.get('m3_prod_mod') != old_prod or request.data.get(
-                        'm3_peak_mod') != old_peak or request.data.get('m3_q6_mod') != old_q6 or request.data.get(
-                    'm3_q7_mod') != old_q7:
-                    # 如果更新了其中的任何一个，重新计算lin_tot
-                    lin_tot = request.data.get('m3_prod_mod') * apsa.cooling_fixed / 100
-                    lin_tot += request.data.get('m3_q6_mod') + request.data.get('m3_q7_mod') + request.data.get(
-                        'm3_peak_mod')
+                # 判断是否更新了q6, q7, peak, prod
+                if request.data.get('lin_tot_mod') == old_lin_tot:
+                    if request.data.get('m3_prod_mod') != old_prod or request.data.get(
+                            'm3_peak_mod') != old_peak or request.data.get('m3_q6_mod') != old_q6 or request.data.get(
+                        'm3_q7_mod') != old_q7:
+                        # 如果更新了其中的任何一个，重新计算lin_tot
+                        lin_tot = request.data.get('m3_prod_mod') * apsa.cooling_fixed / 100
+                        lin_tot += request.data.get('m3_q6_mod') + request.data.get('m3_q7_mod') + request.data.get(
+                            'm3_peak_mod')
 
+                        # 获取主设备
+                        main_apsa_id = apsa.daily_bind
+
+                        # 将新老lin_tot差值更新到主设备中
+                        diff_lin_tot = lin_tot - old_lin_tot
+                        main_daily_mod = DailyMod.objects.get(date=daily_mod.date, apsa_id=main_apsa_id)
+                        main_daily_mod.lin_tot_mod = round(main_daily_mod.lin_tot_mod - diff_lin_tot, 2)
+                        main_daily_mod.save()
+
+                        # 更新从设备lin_tot
+                        daily_mod.lin_tot_mod = lin_tot
+                else:
                     # 获取主设备
                     main_apsa_id = apsa.daily_bind
-
-                    # 将新老lin_tot差值更新到主设备中
+                    # 若手动填写了lin_tot则不再重新计算，默认已计算过
+                    lin_tot = request.data.get('lin_tot_mod')
                     diff_lin_tot = lin_tot - old_lin_tot
                     main_daily_mod = DailyMod.objects.get(date=daily_mod.date, apsa_id=main_apsa_id)
                     main_daily_mod.lin_tot_mod = round(main_daily_mod.lin_tot_mod - diff_lin_tot, 2)
@@ -1050,102 +1091,121 @@ class DailyModModelView(RetrieveUpdateViewSet):
                     # 更新从设备lin_tot
                     daily_mod.lin_tot_mod = lin_tot
             else:
-                # 获取主设备
-                main_apsa_id = apsa.daily_bind
-                # 若手动填写了lin_tot则不再重新计算，默认已计算过
-                lin_tot = request.data.get('lin_tot_mod')
-                diff_lin_tot = lin_tot - old_lin_tot
-                main_daily_mod = DailyMod.objects.get(date=daily_mod.date, apsa_id=main_apsa_id)
-                main_daily_mod.lin_tot_mod = round(main_daily_mod.lin_tot_mod - diff_lin_tot, 2)
-                main_daily_mod.save()
+                daily_mod.lin_tot_mod = request.data.get('lin_tot_mod')
+        except Exception:
+            return JResp("daily联动lintot计算错误", 400)
 
-                # 更新从设备lin_tot
-                daily_mod.lin_tot_mod = lin_tot
-        else:
-            daily_mod.lin_tot_mod = request.data.get('lin_tot_mod')
-        daily_mod.h_prod_mod = request.data.get('h_prod_mod')
-        daily_mod.h_stpal_mod = request.data.get('h_stpal_mod')
-        daily_mod.h_stpdft_mod = request.data.get('h_stpdft_mod')
-        daily_mod.h_stp400v_mod = request.data.get('h_stp400v_mod')
-        daily_mod.m3_prod_mod = request.data.get('m3_prod_mod')
-        daily_mod.m3_tot_mod = request.data.get('m3_tot_mod')
-        daily_mod.m3_q1_mod = request.data.get('m3_q1_mod')
-        daily_mod.m3_peak_mod = request.data.get('m3_peak_mod')
-        daily_mod.m3_q5_mod = request.data.get('m3_q5_mod')
-        daily_mod.m3_q6_mod = request.data.get('m3_q6_mod')
-        daily_mod.m3_q7_mod = request.data.get('m3_q7_mod')
-        daily_mod.flow_meter_mod = request.data.get('flow_meter_mod')
-        daily_mod.user = request.data.get('user')
-        daily_mod.comment = request.data.get('comment')
-        daily_mod.save()
-        return Response({'status': 200, 'msg': '修改DailyMod成功'})
+        try:
+            daily_mod.h_prod_mod = request.data.get('h_prod_mod')
+            daily_mod.h_stpal_mod = request.data.get('h_stpal_mod')
+            daily_mod.h_stpdft_mod = request.data.get('h_stpdft_mod')
+            daily_mod.h_stp400v_mod = request.data.get('h_stp400v_mod')
+            daily_mod.m3_prod_mod = request.data.get('m3_prod_mod')
+            daily_mod.m3_tot_mod = request.data.get('m3_tot_mod')
+            daily_mod.m3_q1_mod = request.data.get('m3_q1_mod')
+            daily_mod.m3_peak_mod = request.data.get('m3_peak_mod')
+            daily_mod.m3_q5_mod = request.data.get('m3_q5_mod')
+            daily_mod.m3_q6_mod = request.data.get('m3_q6_mod')
+            daily_mod.m3_q7_mod = request.data.get('m3_q7_mod')
+            daily_mod.flow_meter_mod = request.data.get('flow_meter_mod')
+            daily_mod.user = request.data.get('user')
+            daily_mod.comment = request.data.get('comment')
+            daily_mod.save()
+        except Exception:
+            return JResp("daily_mod更新保存失败", 400)
+
+        return JResp()
+
+    def retrieve(self, request, pk):
+        try:
+            daily_mod = DailyMod.objects.get(id=pk)
+        except Exception:
+            return JResp("查询记录失败", 400)
+
+        try:
+            data = self.get_serializer(daily_mod).data
+        except Exception:
+            return JResp("序列化失败", 400)
+
+        return JResp(data=data)
 
 
 class DailyOriginView(View):
     def get(self, request, pk):
-        daily = Daily.objects.get(id=pk)
-        return JsonResponse({
-            'h_prod': daily.h_prod,
-            'h_stpal': daily.h_stpal,
-            'h_stpdft': daily.h_stpdft,
-            'h_stp400v': daily.h_stp400v,
-            'm3_prod': daily.m3_prod,
-            'm3_tot': daily.m3_tot,
-            'm3_q1': daily.m3_q1,
-            'm3_peak': daily.m3_peak,
-            'm3_q5': daily.m3_q5,
-            'm3_q6': daily.m3_q6,
-            'm3_q7': daily.m3_q7,
-            'lin_tot': daily.lin_tot,
-            'flow_meter': daily.flow_meter
-        })
+        try:
+            daily = Daily.objects.get(id=pk)
+        except Exception:
+            return JResp("查询记录失败", 400)
+        return JResp(
+            data={
+                'h_prod': daily.h_prod,
+                'h_stpal': daily.h_stpal,
+                'h_stpdft': daily.h_stpdft,
+                'h_stp400v': daily.h_stp400v,
+                'm3_prod': daily.m3_prod,
+                'm3_tot': daily.m3_tot,
+                'm3_q1': daily.m3_q1,
+                'm3_peak': daily.m3_peak,
+                'm3_q5': daily.m3_q5,
+                'm3_q6': daily.m3_q6,
+                'm3_q7': daily.m3_q7,
+                'lin_tot': daily.lin_tot,
+                'flow_meter': daily.flow_meter
+            })
 
 
 class DailyLintotView(View):
     def get(self, request, pk):
         rsp = []
-        daily = Daily.objects.get(id=pk)
+        try:
+            daily = Daily.objects.get(id=pk)
+        except Exception:
+            return JResp("查询记录失败", 400)
+
         apsa = daily.apsa
-        if apsa.daily_js == 0:
-            return JsonResponse([{
-                "error": 1,
-                "msg": "该APSA不计算daily"
-            }], safe=False)
-        elif apsa.daily_js == 2:
-            main_apsa = Apsa.objects.get(id=apsa.daily_bind)
-            return JsonResponse([{
-                "error": 1,
-                "msg": f"该APSA从属于{main_apsa.asset.rtu_name}，LINTOT为固定值"
-            }], safe=False)
-        t_start = daily.date
-        t_end = (t_start + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
-        bulks = Bulk.objects.filter(asset__site=apsa.asset.site, filling_js=1)
-        for bulk in bulks:
-            filling_quantity = sum([
-                x.quantity for x in Filling.objects.filter(bulk=bulk, time_1__range=[t_start, t_end])
-            ])
-            # 计算储罐首尾液位差量
-            variable = Variable.objects.get(asset=bulk.asset, daily_mark='LEVEL')
-            try:
-                l_0 = Record.objects.get(variable=variable, time=t_start).value
-                l_1 = Record.objects.get(variable=variable, time=t_end).value
-                lin_bulk = (l_0 - l_1) / 100 * bulk.tank_size * 1000  # 单位:升(液态)
-            except Exception as e:
-                print(e)
-                l_0 = l_1 = lin_bulk = 0
+        # 查询计算Lintot过程值
+        try:
+            if apsa.daily_js == 0:
+                return JsonResponse([{
+                    "error": 1,
+                    "msg": "该APSA不计算daily"
+                }], safe=False)
+            elif apsa.daily_js == 2:
+                main_apsa = Apsa.objects.get(id=apsa.daily_bind)
+                return JsonResponse([{
+                    "error": 1,
+                    "msg": f"该APSA从属于{main_apsa.asset.rtu_name}，LINTOT为固定值"
+                }], safe=False)
+            t_start = daily.date
+            t_end = (t_start + timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
+            bulks = Bulk.objects.filter(asset__site=apsa.asset.site, filling_js=1)
+            for bulk in bulks:
+                filling_quantity = sum([
+                    x.quantity for x in Filling.objects.filter(bulk=bulk, time_1__range=[t_start, t_end])
+                ])
+                # 计算储罐首尾液位差量
+                variable = Variable.objects.get(asset=bulk.asset, daily_mark='LEVEL')
+                try:
+                    l_0 = Record.objects.get(variable=variable, time=t_start).value
+                    l_1 = Record.objects.get(variable=variable, time=t_end).value
+                    lin_bulk = (l_0 - l_1) / 100 * bulk.tank_size * 1000  # 单位:升(液态)
+                except Exception:
+                    l_0 = l_1 = lin_bulk = 0
 
-            rsp.append({
-                "bulk_id": bulk.id,
-                "bulk_name": bulk.asset.name,
-                "tank_size": bulk.tank_size,
-                "l1": round(l_0, 2),
-                "l2": round(l_1, 2),
-                "lin_bulk": round(lin_bulk / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2),
-                "filling_quantity": round(filling_quantity / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2),
-                "lin_tot": round((filling_quantity + lin_bulk) / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2)
-            })
+                rsp.append({
+                    "bulk_id": bulk.id,
+                    "bulk_name": bulk.asset.name,
+                    "tank_size": bulk.tank_size,
+                    "l1": round(l_0, 2),
+                    "l2": round(l_1, 2),
+                    "lin_bulk": round(lin_bulk / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2),
+                    "filling_quantity": round(filling_quantity / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2),
+                    "lin_tot": round((filling_quantity + lin_bulk) / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2)
+                })
+        except Exception:
+            return JResp("获取lintot失败", 400)
 
-        return JsonResponse(rsp, safe=False)
+        return JResp(data=rsp)
 
 
 class MalfunctionModelView(ModelViewSet):

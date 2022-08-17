@@ -1,6 +1,8 @@
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
+from utils import JResp
+
 
 class PageNum(PageNumberPagination):
     """
@@ -11,8 +13,10 @@ class PageNum(PageNumberPagination):
 
     def get_paginated_response(self, data):
         """重写返回方法"""
-        return Response(
-            {
+        return JResp(
+            msg="ok",
+            status=200,
+            data={
                 'total': self.page.paginator.count,
                 'page': self.page.number,
                 'pages': self.page.paginator.num_pages,

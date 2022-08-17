@@ -916,7 +916,6 @@ class ApsaModelView(UpdateListRetrieveViewSet):
         daily_bind = request.data.get('daily_bind')
         cooling_fixed = request.data.get('cooling_fixed')
         comment = request.data.get('comment')
-        mark = request.data.get('mark')
 
         try:
             apsa = Apsa.objects.get(id=int(pk))

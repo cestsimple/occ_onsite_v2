@@ -1338,7 +1338,7 @@ class RefreshAllAsset(APIView):
                 # 任务完成，返回
                 jobs.update('IOT_ALL', 'OK')
                 return
-            time.sleep(5)
+            time.sleep(1)
         # 刷新超时，计入失败
         jobs.update('IOT_ALL', 'ERROR: TIME OUT')
 

@@ -31,7 +31,7 @@ class FillingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Filling
-        fields = '__all__'
+        exclude = ['created_at', 'updated_at']
         read_only_fields = ['rtu_name', 'asset_name', 'tank_size', 'id']
         write_only_fields = ['bulk']
 
@@ -39,7 +39,7 @@ class FillingSerializer(serializers.ModelSerializer):
 class DailyModSerializer(serializers.ModelSerializer):
     class Meta:
         model = DailyMod
-        exclude = ['date', 'apsa']
+        exclude = ['date', 'apsa', 'created_at', 'updated_at']
         extra_kwargs = {
             'comment': {'allow_blank': True},
         }
@@ -93,7 +93,7 @@ class MalfunctionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Malfunction
-        fields = '__all__'
+        exclude = ['created_at', 'updated_at']
         extra_kwargs = {
             'reason_main': {'allow_blank': True},
             'reason_l1': {'allow_blank': True},
@@ -111,7 +111,7 @@ class MalfunctionSerializer(serializers.ModelSerializer):
 class DailySerializer(serializers.ModelSerializer):
     class Meta:
         model = Daily
-        fields = '__all__'
+        exclude = ['created_at', 'updated_at']
 
 
 class FillingMonthlySerializer(serializers.ModelSerializer):

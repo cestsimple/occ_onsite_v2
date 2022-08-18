@@ -13,6 +13,8 @@ class Filling(models.Model):
     level_2 = models.FloatField(max_length=20, verbose_name="Level After")
     quantity = models.FloatField(max_length=20, verbose_name="Filling Quantity")
     confirm = models.IntegerField(verbose_name='确认标志', default=0)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 
     class Meta:
         ordering = ['id']
@@ -39,6 +41,8 @@ class Daily(models.Model):
     flow_meter = models.FloatField(max_length=20, default=0)
     success = models.IntegerField(default=0)
     confirm = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 
     class Meta:
         ordering = ['id']
@@ -64,6 +68,8 @@ class DailyMod(models.Model):
     flow_meter_mod = models.FloatField(max_length=20, default=0)
     comment = models.CharField(max_length=300, default='')
     user = models.CharField(max_length=100, verbose_name="最后修改用户")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 
 
 class Malfunction(models.Model):
@@ -89,6 +95,8 @@ class Malfunction(models.Model):
     change_date = models.DateTimeField(verbose_name="最后修改时间")
     change_user = models.CharField(max_length=100, verbose_name="最后修改用户")
     confirm = models.IntegerField(verbose_name='确认标志', default=0)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 
     class Meta:
         ordering = ['id']

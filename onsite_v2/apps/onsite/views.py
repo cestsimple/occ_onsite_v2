@@ -685,9 +685,14 @@ class FillingModelView(ModelViewSet):
             self.queryset = self.queryset.filter(bulk__asset__site__engineer__group=group)
         if name:
             name = name.strip().upper()
-            self.queryset = self.queryset.filter(
-                Q(bulk__asset__rtu_name__contains=name) | Q(bulk__asset__site__name__contains=name)
-            )
+            if "CN_" in name:
+                self.queryset = self.queryset.filter(
+                    Q(bulk__asset__rtu_name=name) | Q(bulk__asset__site__name=name)
+                )
+            else:
+                self.queryset = self.queryset.filter(
+                    Q(bulk__asset__rtu_name__contains=name) | Q(bulk__asset__site__name__contains=name)
+                )
         if start and end:
             start = start.replace('+', '')
             end = end.replace('+', '')
@@ -1235,9 +1240,14 @@ class MalfunctionModelView(ModelViewSet):
             self.queryset = self.queryset.filter(apsa__asset__site__engineer__group=group)
         if name:
             name = name.strip().upper()
-            self.queryset = self.queryset.filter(
-                Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
-            )
+            if "CN_" in name:
+                self.queryset = self.queryset.filter(
+                    Q(apsa__asset__rtu_name=name) | Q(apsa__asset__site__name=name)
+                )
+            else:
+                self.queryset = self.queryset.filter(
+                    Q(apsa__asset__rtu_name__contains=name) | Q(apsa__asset__site__name__contains=name)
+                )
         if reason is not None and isinstance(reason, list) and reason != []:
             self.queryset = self.queryset.filter(reason_main__in=reason)
 

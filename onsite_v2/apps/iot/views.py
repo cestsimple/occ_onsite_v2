@@ -262,8 +262,8 @@ class AssetData(View):
 
         # 批量写入数据库
         try:
-            Asset.objects.bulk_create(list_create, batch_size=20)
-            Asset.objects.bulk_update(list_update, batch_size=20, fields=['name', 'site', 'status', 'variables_num'])
+            Asset.objects.bulk_create(list_create, batch_size=10)
+            Asset.objects.bulk_update(list_update, batch_size=10, fields=['name', 'site', 'status', 'variables_num'])
         except Exception as e:
             print(e)
             jobs.update('IOT_ASSET', e)
@@ -398,7 +398,7 @@ class TagData(View):
         if bulk_list:
             for a in bulk_list:
                 bulk_result += f"{a.asset_id},"
-            bulk_result = f"新建{len(bulk_list)}个APSA,asset_id:" + bulk_result[:-1]
+            bulk_result = f"新建{len(bulk_list)}个BULK,asset_id:" + bulk_result[:-1]
         else:
             bulk_result = "本次没有检测到新增BULK，如有需要请手动添加"
 
@@ -1293,7 +1293,7 @@ class RefreshAllAsset(APIView):
         # 获取当前时间，设定任务最大时间
         time_now = datetime.now()
         t_start = int(time.time())
-        max_duration = 15 * 60  # secs
+        max_duration = 25 * 60  # secs
 
         # 创建任务实例
         site = SiteData()

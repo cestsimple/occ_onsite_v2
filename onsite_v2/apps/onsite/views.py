@@ -896,7 +896,7 @@ class FillingMonthlyDetailView(APIView):
 
 class DailyModelView(ListUpdateViewSet):
     # 查询集
-    queryset = Daily.objects.order_by('confirm', 'apsa__asset__site__engineer__region', '-apsa__onsite_series',
+    queryset = Daily.objects.order_by('apsa__asset__site__engineer__region', '-apsa__onsite_series',
                                       'apsa__asset__rtu_name')
     # 序列化器
     serializer_class = DailySerializer

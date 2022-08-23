@@ -9,7 +9,7 @@ class PageNum(PageNumberPagination):
     自定义分页器
     """
     page_size_query_param = 'pagesize'  # 每一页的最大数量
-    max_page_size = 500  # 指定每页最大返回量
+    max_page_size = 50000  # 指定每页最大返回量
 
     def get_paginated_response(self, data):
         """重写返回方法"""

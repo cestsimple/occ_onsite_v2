@@ -701,7 +701,8 @@ class FillingModelView(ModelViewSet):
         return self.queryset
 
     def create(self, request, *args, **kwargs):
-        bulk = request.data.get('bulk')
+        bulk_id = request.data.get('bulk')
+        bulk = Bulk.objects.get(id=bulk_id)
         time_1 = request.data.get('time_1')
         time_2 = request.data.get('time_2')
         level_1 = float(request.data.get('level_1'))
@@ -713,10 +714,10 @@ class FillingModelView(ModelViewSet):
             return Response(f'创建失败，储罐和时间冲突，已存在该记录', status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            tank_size = float(Bulk.objects.get(id=bulk).tank_size)
+            tank_size = float(Bulk.objects.get(id=bulk_id).tank_size)
             quantity = round((level_2 - level_1) / 100 * tank_size * 1000, 2)
             filling = Filling(
-                bulk_id=int(bulk),
+                bulk_id=int(bulk_id),
                 time_1=time_1,
                 time_2=time_2,
                 level_1=level_1,
@@ -724,7 +725,8 @@ class FillingModelView(ModelViewSet):
                 quantity=quantity,
                 confirm=confirm
             )
-            self.update_lin_tot(filling, quantity)
+            if bulk.filling_js == 1:
+                self.update_lin_tot(filling, quantity)
             filling.save()
         except DatabaseError as e:
             return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
@@ -735,13 +737,14 @@ class FillingModelView(ModelViewSet):
         # 查询记录
         filling = Filling.objects.get(id=pk)
         # 获取参数
-        bulk = request.data.get('bulk')
+        bulk_id = request.data.get('bulk')
+        bulk = Bulk.objects.get(id=bulk_id)
         time_1 = request.data.get('time_1')
         time_2 = request.data.get('time_2')
         level_1 = float(request.data.get('level_1'))
         level_2 = float(request.data.get('level_2'))
         confirm = float(request.data.get('confirm'))
-        tank_size = float(Bulk.objects.get(id=bulk).tank_size)
+        tank_size = float(Bulk.objects.get(id=bulk_id).tank_size)
         quantity = round((level_2 - level_1) / 100 * tank_size * 1000, 2)  # 液体L
         # 保存数据
         try:
@@ -749,7 +752,8 @@ class FillingModelView(ModelViewSet):
             filling.time_2 = time_2
             filling.level_1 = level_1
             filling.level_2 = level_2
-            self.update_lin_tot(filling, quantity - filling.quantity)
+            if bulk.filling_js == 1:
+                self.update_lin_tot(filling, quantity - filling.quantity)
             filling.quantity = quantity
             filling.confirm = confirm
             filling.save()
@@ -1116,8 +1120,10 @@ class DailyModModelView(RetrieveUpdateViewSet):
             daily_mod.user = request.data.get('user')
             daily_mod.comment = request.data.get('comment')
             daily_mod.save()
-        except Exception:
-            return JResp("daily_mod更新保存失败", 400)
+        except ValueError:
+            return JResp("daily_mod更新保存失败,填写的数据类型错误", 400)
+        except Exception as e:
+            return JResp(f"daily_mod更新保存失败，{e}", 400)
 
         return JResp()
 

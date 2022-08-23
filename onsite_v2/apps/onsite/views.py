@@ -389,8 +389,8 @@ class DailyCalculate(View):
         if not self.error:
             d_res['success'] = 1
 
-        # 若为从气站，且已有数据(重跑)，先恢复主气站lin_tot_mod
         record = Daily.objects.filter(apsa=self.apsa, date=self.t_start)
+        # 若为从气站，且已有数据(重跑)
         if self.apsa.daily_js == 2 and record.count() == 1:
             apsa = Apsa.objects.get(id=self.apsa.daily_bind)
             bind_daily_mod = DailyMod.objects.get(apsa=apsa, date=self.t_start)
@@ -414,14 +414,19 @@ class DailyCalculate(View):
         try:
             # 创建自己的MOD数据
             daily_mod = DailyMod.objects.filter(apsa=self.apsa, date=self.t_start)
+
+            # 若是重跑，保存已有lin_tot_mod
+            lin_tot_mod_save = 0
             if daily_mod.count() == 1:
                 # 若已存在daily_mod说明是重跑，则先删除mod
+                lin_tot_mod_save = daily_mod[0].lin_tot_mod
                 daily_mod[0].delete()
 
             DailyMod.objects.create(
                 apsa=self.apsa,
                 date=self.t_start,
                 comment=comment,
+                lin_tot_mod=lin_tot_mod_save,
                 user='SYSTEM'
             )
 
@@ -1092,7 +1097,7 @@ class DailyModModelView(RetrieveUpdateViewSet):
                     main_apsa_id = apsa.daily_bind
                     # 若手动填写了lin_tot则不再重新计算，默认已计算过
                     lin_tot = request.data.get('lin_tot_mod')
-                    diff_lin_tot = lin_tot - old_lin_tot
+                    diff_lin_tot = float(lin_tot) - old_lin_tot
                     main_daily_mod = DailyMod.objects.get(date=daily_mod.date, apsa_id=main_apsa_id)
                     main_daily_mod.lin_tot_mod = round(main_daily_mod.lin_tot_mod - diff_lin_tot, 2)
                     main_daily_mod.save()

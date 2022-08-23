@@ -1354,3 +1354,8 @@ class KillRecordTaskView(View):
             job.finish_time = datetime.now()
             job.save()
         return JsonResponse({"status": 200, 'msg': 'ok', 'affected rows': len(sub_jobs+1)})
+
+
+class GetUUID(View):
+    def get(self, request):
+        pass

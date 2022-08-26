@@ -57,3 +57,28 @@ class ColumnSetting(models.Model):
 
     class Meta:
         verbose_name_plural = "区域表格信息列配置表"
+
+
+# LOCATOR_CHOICE = [
+#     ("xpath", "元素Xpath"),
+#     ("class", "元素类名"),
+#     ("css", "元素CSS"),
+#     ("id", "元素ID"),
+#     ("name", "元素Name属性"),
+#     ("tag", "元素Tag"),
+# ]
+#
+# INTERACTION_CHOICE = [
+#     ("click", "点击"),
+#     ("send_key", "按键"),
+#     ("clear", "清除内容"),
+# ]
+#
+#
+# class SeleniumStep(models.Model):
+#     id = models.AutoField(primary_key=True, verbose_name="步骤id")
+#     task = models.IntegerField(null=False, verbose_name="所属任务")
+#     order = models.IntegerField(null=False, verbose_name="执行顺序")
+#     locator = models.CharField(max_length=10, choices=LOCATOR_CHOICE, verbose_name="定位方式")
+#     interaction = models.CharField(max_length=10, choices=LOCATOR_CHOICE, verbose_name="互动类型")
+#     args = models.CharField(max_length=500, verbose_name="参数", null=True)

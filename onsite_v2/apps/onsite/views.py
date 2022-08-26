@@ -1210,6 +1210,7 @@ class DailyLintotView(View):
 
                 rsp.append({
                     "bulk_id": bulk.id,
+                    "variable_id": variable.id,
                     "bulk_name": bulk.asset.name,
                     "tank_size": bulk.tank_size,
                     "l1": round(l_0, 2),

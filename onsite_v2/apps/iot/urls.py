@@ -32,14 +32,19 @@ urlpatterns = [
     url(r'^asset/(?P<pk>\d+)/$', views.AssetModelView.as_view({'get': 'retrieve', 'put': 'update'})),
 
     # 添加原始数据
-    url(r'^iot/origin/$', views.AddOriginDataView.as_view()),
+    url(r'^iot/origin/$', views.AddOriginDataView.as_view()),  # 过期无效
+    url(r'^iot/record/add/$', views.CreateRecord.as_view()),
 
     # job
     url(r'^asyncjob/$', views.AsyncJobModelView.as_view({'get': 'list'})),
     url(r'^asyncjob/(?P<pk>\d+)/$', views.AsyncJobModelView.as_view({'delete': 'destroy'})),
+    url(r'^asyncjob/clear/$', views.AsyncJobModelView.as_view({'get': 'clear'})),
 
     # delete dup
     url(r'^dup/site/', views.DeleteSiteDup.as_view()),
     url(r'^dup/asset/', views.DeleteAssetDup.as_view()),
-    url(r'^dup/variable/', views.DeleteVariableDup.as_view())
+    url(r'^dup/variable/', views.DeleteVariableDup.as_view()),
+
+    # 查询UUID
+    url(r'^uuid/$', views.GetUUID.as_view()),
 ]

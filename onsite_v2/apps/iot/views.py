@@ -1,4 +1,5 @@
-﻿import threading
+﻿import json
+import threading
 import time
 import requests
 from django.db import DatabaseError
@@ -17,7 +18,7 @@ from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
 from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record, OriginAssetData
 from datetime import datetime, timedelta
-from utils import jobs
+from utils import jobs, JResp
 from .serializer import SiteSerializer, ApsaSerializer, BulkSerializer, VariableSerializer, AssetApsaSerializer, \
     AssetBulkSerializer, AsyncJobSerializer
 from ..onsite.models import MonthlyVariable
@@ -1273,6 +1274,26 @@ class AsyncJobModelView(ModelViewSet):
 
         return query_set.filter(~Q(name='IOT_TOKEN'))
 
+    def clear(self, request):
+        try:
+            day: int = int(self.request.query_params.get("day"))
+            # 设置最小预留天数
+            if day <= 1:
+                day = 1
+            # 转化为日期
+            dt = (datetime.now() + timedelta(days=-day)).strftime("%Y-%m-%d")
+        except Exception:
+            return JResp("缺少参数或类型错误", 400)
+
+        try:
+            # 删除数据库文件
+            AsyncJob.objects.filter(start_time__lte=dt).delete()
+        except Exception:
+            return JResp("数据库内部错误", 400)
+
+        # 返回成功
+        return JResp()
+
 
 class RefreshAllAsset(APIView):
     def get(self, request):
@@ -1358,4 +1379,51 @@ class KillRecordTaskView(View):
 
 class GetUUID(View):
     def get(self, request):
-        pass
+        key = request.GET.get("key")
+        if not key:
+            return JResp("关键字不能为空", 400)
+
+        assets = Asset.objects.filter(rtu_name=key.upper())
+
+        if assets.count() == 0:
+            return JResp("未找到该RTU", 404)
+
+        rsp = []
+        for asset in assets:
+            variables = Variable.objects.filter(asset=asset).filter(~Q(daily_mark=''))
+            v_rsp = []
+            for v in variables:
+                v_rsp.append({
+                    "variable_name": v.name,
+                    "variable_id": v.id
+                })
+            rsp.append({
+                "asset_name": f"{asset.rtu_name}-{asset.name}",
+                "asset_id": asset.id,
+                "variables": v_rsp
+            })
+
+        return JResp(data=rsp)
+
+
+class CreateRecord(View):
+    def post(self, request):
+        body = json.loads(request.body.decode('utf-8'))
+        v_id = body.get("variable_id")
+        dt = body.get("dt")
+        value = body.get("value")
+
+        if not all([v_id, dt, value]):
+            return JResp("参数不齐全", 400)
+
+        try:
+            Record.objects.update_or_create(
+                variable_id=v_id,
+                value=float(value),
+                time=dt
+            )
+        except Exception as e:
+            print(e)
+            return JResp("创建失败，数据格式类型错误", 400)
+
+        return JResp()

@@ -1234,7 +1234,7 @@ class MalfunctionModelView(ModelViewSet):
     # 指定分页器
     pagination_class = PageNum
     # 权限
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         # 重写，添加条件过滤功能
@@ -1289,6 +1289,7 @@ class MalfunctionModelView(ModelViewSet):
         stop_count = int(request.data.get('stop_count'))
         stop_hour = float(request.data.get('stop_hour'))
         stop_consumption = float(request.data.get('stop_consumption'))
+        confirm = request.data.get('confirm')
 
         try:
             Malfunction.objects.create(
@@ -1311,7 +1312,7 @@ class MalfunctionModelView(ModelViewSet):
                 occ_comment=occ_comment,
                 change_user=change_user,
                 change_date=datetime.now(),
-                confirm=1
+                confirm=int(confirm) if confirm else 1,
             )
         except DatabaseError as e:
             return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
@@ -1327,7 +1328,7 @@ class ReasonModelView(ListViewSet):
     # 指定分页器
     pagination_class = PageNum
     # 权限
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
 
     def list(self, request):
         query = request.query_params

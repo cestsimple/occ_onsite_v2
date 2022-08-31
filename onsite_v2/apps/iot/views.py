@@ -49,7 +49,7 @@ def get_cognito():
 
     # 申请token
     username = 'xiangzhe.hou@airliquide.com'
-    password = 'Sunboy27!'
+    password = 'ZXCzxc1234!'
     user = Cognito(
         user_pool_id='eu-west-1_XxAZFKMzE',
         client_id='oppih8pblveb0qb27sl8k9ubc',
@@ -1427,3 +1427,13 @@ class CreateRecord(View):
             return JResp("创建失败，数据格式类型错误", 400)
 
         return JResp()
+
+
+class ApsaInfo(View):
+    def get(self, rqeuest):
+        rsp = {}
+        for apsa in Apsa.objects.all():
+            rtu_name = apsa.asset.rtu_name
+            rsp[rtu_name] = apsa.id
+
+        return JResp(data=rsp)

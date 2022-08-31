@@ -47,4 +47,7 @@ urlpatterns = [
 
     # 查询UUID
     url(r'^uuid/$', views.GetUUID.as_view()),
+
+    # 查询Apsainfo
+    url(r'^apsainfo/$', views.ApsaInfo.as_view())
 ]

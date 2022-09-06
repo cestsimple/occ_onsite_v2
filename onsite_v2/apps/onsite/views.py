@@ -1,3 +1,4 @@
+import json
 import threading
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -906,7 +907,7 @@ class FillingMonthlyDetailView(APIView):
 class DailyModelView(ListUpdateViewSet):
     # 查询集
     queryset = Daily.objects.order_by('apsa__asset__site__engineer__region', '-apsa__onsite_series',
-                                      'apsa__asset__rtu_name')
+                                      'apsa__asset__rtu_name', 'date')
     # 序列化器
     serializer_class = DailySerializer
     # 指定分页器
@@ -1846,3 +1847,58 @@ class MalfunctionLock(APIView):
             return Response(status=500, data=f"数据库错误:{e}")
 
         return Response(status=200, data="ok")
+
+
+class DailyImportView(View):
+    def post(self, request):
+        try:
+            apsa_id = request.POST.get("apsa_id")
+            date = request.POST.get("date")
+            h_prod = request.POST.get("h_prod")
+            h_stpal = request.POST.get("h_stpal")
+            h_stpdft = request.POST.get("h_stpdft")
+            h_stp400v = request.POST.get("h_stp400v")
+            m3_prod = request.POST.get("m3_prod")
+            m3_tot = request.POST.get("m3_tot")
+            m3_peak = request.POST.get("m3_peak")
+            m3_q1 = request.POST.get("m3_q1")
+            m3_q6 = request.POST.get("m3_q6")
+            m3_q5 = request.POST.get("m3_q5")
+            m3_q7 = request.POST.get("m3_q7")
+            filling = request.POST.get("filling")
+            lin_tot = request.POST.get("lin_tot")
+        except Exception as e:
+            return JResp(status=400, msg="参数错误")
+
+        try:
+            # 创建daily数据
+            Daily.objects.update_or_create(
+                apsa_id=apsa_id,
+                date=date,
+                h_prod=h_prod,
+                h_stpal=h_stpal,
+                h_stpdft=h_stpdft,
+                h_stp400v=h_stp400v,
+                m3_prod=m3_prod,
+                m3_tot=m3_tot,
+                m3_peak=m3_peak,
+                m3_q1=m3_q1,
+                m3_q5=m3_q5,
+                m3_q6=m3_q6,
+                m3_q7=m3_q7,
+                filling=filling,
+                lin_tot=lin_tot,
+                flow_meter=0,
+                success=1,
+            )
+
+            # 创建daily_mod
+            DailyMod.objects.update_or_create(
+                apsa_id=apsa_id,
+                date=date,
+                user="system"
+            )
+        except Exception:
+            return JResp(status=500, msg=f"创建失败 {date} - {apsa_id}")
+
+        return JResp()

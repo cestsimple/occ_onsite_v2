@@ -1437,3 +1437,141 @@ class ApsaInfo(View):
             rsp[rtu_name] = apsa.id
 
         return JResp(data=rsp)
+
+
+class ManuelCreateAsset(View):
+    def __init__(self):
+        self.uuid: str = ""
+        self.is_apsa: int = 0
+        self.user: str = ""
+        self.res: dict = {}
+
+    def get(self, request):
+        # 获取参数
+        try:
+            self.uuid = request.GET.get("uuid")
+            self.is_apsa = int(request.GET.get("is_apsa"))
+            self.user = request.GET.get('user')
+            # 参数验证
+            if not all([self.uuid, self.user]):
+                return JResp("参数不齐全", 400)
+        except Exception:
+            return JResp("参数错误", 400)
+
+        # 检查Job状态
+        if jobs.check("IOT_ASSET_MANUEL", user=self.user, params=f"uuid={self.uuid}&is_apsa={self.is_apsa}"):
+            return JResp("任务正在进行中，请稍后刷新", 400)
+
+        # 子线程抓取数据
+        threading.Thread(target=self.refresh_main).start()
+
+        # 返回相应结果
+        return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新中'})
+
+    def refresh_main(self):
+        # 检查uuid是否存在
+        if Asset.objects.filter(uuid=self.uuid).count() != 0:
+            jobs.update("IOT_ASSET_MANUEL", "错误：该UUID已存在")
+            return
+
+        # 抓取资产信息
+        url: str = "https://bos.iot.airliquide.com/api/v1/assets/" + self.uuid
+        try:
+            self.res = requests.get(url, headers=get_cognito()).json()
+        except Exception as e:
+            print(e)
+            jobs.update("IOT_ASSET_MANUEL", "错误：向IOT请求asset或解析失败")
+            return
+
+        # 判断气站uuid是否存在,创建气站
+        try:
+            site_dic: dict = self.res["site"]
+            if Site.objects.filter(uuid=site_dic["id"]).count() == 0:
+                Site.objects.create(uuid=site_dic["id"], name=site_dic["name"])
+        except Exception:
+            jobs.update("IOT_ASSET_MANUEL", "错误：Site创建失败")
+            return
+
+        # 创建资产
+        try:
+            Asset.objects.create(
+                uuid=self.uuid,
+                name=self.res["name"],
+                rtu_name="",
+                site=Site.objects.get(uuid=site_dic["id"]),
+                status=self.res['status']['name'],
+                variables_num=self.res['totalVariables'],
+                tags="ONSITE"
+            )
+        except Exception:
+            jobs.update("IOT_ASSET_MANUEL", "错误：Asset创建失败")
+            return
+
+        # 创建Bulk/Apsa
+        try:
+            if self.is_apsa:
+                Apsa.objects.create(
+                    asset=Asset.objects.get(uuid=self.uuid),
+                )
+            else:
+                Bulk.objects.create(
+                    asset=Asset.objects.get(uuid=self.uuid),
+                )
+        except Exception:
+            jobs.update("IOT_ASSET_MANUEL", "错误：Apsa/Bulk创建失败")
+            return
+
+        # 抓取该资产的所有变量信息
+        try:
+            url = "https://bos.iot.airliquide.com/api/v1/assets/"
+        except Exception:
+            jobs.update("IOT_ASSET_MANUEL", "错误：向IOT请求variable或解析失败")
+            return
+
+        # 检查变量uuid是否存在，并创建
+        try:
+            asset = Asset.objects.get(uuid=self.uuid)
+            asset_name = asset.name
+            url = f'{URL}/assets/{self.uuid}/variables?limit=1000'
+            res = requests.get(url, headers=get_cognito()).json()["content"]
+            for c in res:
+                variable_name = c["name"]
+                if Variable.objects.filter(uuid=c["id"]).count() == 0:
+                    Variable.objects.create(
+                        uuid=c["id"],
+                        name=variable_name,
+                        asset=asset,
+                        daily_mark=self.get_daily_mark(variable_name, asset_name),
+                    )
+        except Exception:
+            jobs.update("IOT_ASSET_MANUEL", "错误：Variables创建失败")
+            return
+
+        # Job信息更新
+        asset_type: str = "apsa" if self.is_apsa else "bulk"
+        jobs.update("IOT_ASSET_MANUEL", f"成功创建{asset_type},请在资产管理中查看")
+
+    def get_daily_mark(self, name, asset_name):
+        # Daily标志列表
+        daily_list = [
+            'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
+            'H_STPDFT', 'H_STP400V', 'M3_PEAK',
+        ]
+        daily_mark = ''
+        # 自动匹配Daily标志
+        if name in daily_list:
+            daily_mark = name
+        if name == 'M3PEAK':
+            daily_mark = 'M3_PEAK'
+        if 'M3_PROD' in name:
+            daily_mark = 'M3_PROD'
+        if name == 'M3PEAK' or name == 'PEAKM3':
+            daily_mark = 'M3_PEAK'
+        if name == 'H_STPCUST':
+            daily_mark = 'H_STP400V'
+        if name == 'LEVEL_CC':
+            daily_mark = 'LEVEL'
+        # 检查T系列CUST取消400V
+        if 'T' in asset_name and name == 'H_STPCUST':
+            daily_mark = ''
+        return daily_mark

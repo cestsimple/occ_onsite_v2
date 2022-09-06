@@ -30,6 +30,8 @@ urlpatterns = [
     # 查询asset修改数据
     url(r'^asset/$', views.AssetModelView.as_view({'get': 'list', 'put': 'update'})),
     url(r'^asset/(?P<pk>\d+)/$', views.AssetModelView.as_view({'get': 'retrieve', 'put': 'update'})),
+    # 手动添加asset
+    url(r'^iot/asset/manuel/', views.ManuelCreateAsset.as_view()),
 
     # 添加原始数据
     url(r'^iot/origin/$', views.AddOriginDataView.as_view()),  # 过期无效

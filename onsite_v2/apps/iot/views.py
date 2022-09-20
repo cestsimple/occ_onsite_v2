@@ -1,4 +1,5 @@
 ﻿import json
+import re
 import threading
 import time
 import requests
@@ -1449,12 +1450,14 @@ class ManuelCreateAsset(View):
     def get(self, request):
         # 获取参数
         try:
-            self.uuid = request.GET.get("uuid")
+            self.uuid = request.GET.get("uuid").strip()
             self.is_apsa = int(request.GET.get("is_apsa"))
             self.user = request.GET.get('user')
             # 参数验证
             if not all([self.uuid, self.user]):
                 return JResp("参数不齐全", 400)
+            if re.match(r"[0-9a-z]{8}(-[0-9a-z]{4}){3}-[0-9a-z]{12}", self.uuid):
+                return JResp("uuid格式错误，请检查", 400)
         except Exception:
             return JResp("参数错误", 400)
 

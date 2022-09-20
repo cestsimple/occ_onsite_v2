@@ -735,9 +735,9 @@ class FillingModelView(ModelViewSet):
                 self.update_lin_tot(filling, quantity)
             filling.save()
         except DatabaseError as e:
-            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
+            return JResp(f'数据库操作异常: {e}', 400)
 
-        return Response({'status': 200, 'msg': '充液记录创建成功'})
+        return JResp()
 
     def update(self, request, pk):
         # 查询记录
@@ -764,9 +764,9 @@ class FillingModelView(ModelViewSet):
             filling.confirm = confirm
             filling.save()
         except DatabaseError as e:
-            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
+            return JResp(f'数据库操作异常: {e}', 400)
 
-        return Response({'status': 200, 'msg': '修改充液记录成功'})
+        return JResp()
 
     def destroy(self, request, *args, **kwargs):
         filling = self.get_object()
@@ -776,8 +776,8 @@ class FillingModelView(ModelViewSet):
             filling.delete()
         except Exception as e:
             print(e)
-            return Response(f'数据库操作异常: {e}', status=status.HTTP_400_BAD_REQUEST)
-        return Response({'status': 200, 'msg': '删除充液记录成功'})
+            return JResp(f'数据库操作异常: {e}', 400)
+        return JResp()
 
     def update_lin_tot(self, filling, diff):
         if isinstance(filling.time_1, str):
@@ -785,16 +785,17 @@ class FillingModelView(ModelViewSet):
         else:
             t = filling.time_1.strftime('%Y-%m-%d')
         bulk = filling.bulk
-        # 有可能有两台apsa
+        # 有可能有两台apsa,找到被确认的
         apsa = Apsa.objects.get(asset__rtu_name=bulk.asset.rtu_name, asset__is_apsa=1, asset__confirm=1)
         try:
             daily = Daily.objects.get(apsa=apsa, date=t)
-        except Exception:
+            lin_tot = round(diff / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2)
+            daily.lin_tot = round(daily.lin_tot + lin_tot, 2)
+            daily.filling = round(daily.filling + diff)
+            daily.save()
+        except Exception as e:
+            print(e)
             return
-        lin_tot = round(diff / 1000 * 650 * (273.15 + apsa.temperature) / 273.15, 2)
-        daily.lin_tot = round(daily.lin_tot + lin_tot, 2)
-        daily.filling = round(daily.filling + diff)
-        daily.save()
 
 
 class FillingMonthlyView(ListUpdateViewSet):

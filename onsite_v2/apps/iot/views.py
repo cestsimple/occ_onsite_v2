@@ -1456,7 +1456,7 @@ class ManuelCreateAsset(View):
             # 参数验证
             if not all([self.uuid, self.user]):
                 return JResp("参数不齐全", 400)
-            if re.match(r"[0-9a-z]{8}(-[0-9a-z]{4}){3}-[0-9a-z]{12}", self.uuid):
+            if not re.match(r"[0-9a-z]{8}(-[0-9a-z]{4}){3}-[0-9a-z]{12}", self.uuid):
                 return JResp("uuid格式错误，请检查", 400)
         except Exception:
             return JResp("参数错误", 400)
@@ -1491,8 +1491,8 @@ class ManuelCreateAsset(View):
             site_dic: dict = self.res["site"]
             if Site.objects.filter(uuid=site_dic["id"]).count() == 0:
                 Site.objects.create(uuid=site_dic["id"], name=site_dic["name"])
-        except Exception:
-            jobs.update("IOT_ASSET_MANUEL", "错误：Site创建失败")
+        except Exception as e:
+            jobs.update("IOT_ASSET_MANUEL", f"错误：Site创建失败|{e}")
             return
 
         # 创建资产
@@ -1501,6 +1501,7 @@ class ManuelCreateAsset(View):
                 uuid=self.uuid,
                 name=self.res["name"],
                 rtu_name="",
+                is_apsa=self.is_apsa,
                 site=Site.objects.get(uuid=site_dic["id"]),
                 status=self.res['status']['name'],
                 variables_num=self.res['totalVariables'],

@@ -1074,14 +1074,14 @@ class DailyModModelView(RetrieveUpdateViewSet):
                 old_lin_tot = daily_mod.lin_tot_mod
 
                 # 判断是否更新了q6, q7, peak, prod
-                if request.data.get('lin_tot_mod') == old_lin_tot:
-                    if request.data.get('m3_prod_mod') != old_prod or request.data.get(
-                            'm3_peak_mod') != old_peak or request.data.get('m3_q6_mod') != old_q6 or request.data.get(
-                        'm3_q7_mod') != old_q7:
+                if float(request.data.get('lin_tot_mod')) == old_lin_tot:
+                    if float(request.data.get('m3_prod_mod')) != old_prod or float(request.data.get(
+                            'm3_peak_mod')) != old_peak or float(request.data.get('m3_q6_mod')) != old_q6 or float(request.data.get(
+                        'm3_q7_mod')) != old_q7:
                         # 如果更新了其中的任何一个，重新计算lin_tot
-                        lin_tot = request.data.get('m3_prod_mod') * apsa.cooling_fixed / 100
-                        lin_tot += request.data.get('m3_q6_mod') + request.data.get('m3_q7_mod') + request.data.get(
-                            'm3_peak_mod')
+                        lin_tot = float(request.data.get('m3_prod_mod')) * apsa.cooling_fixed / 100
+                        lin_tot += float(request.data.get('m3_q6_mod')) + float(request.data.get('m3_q7_mod')) + float(request.data.get(
+                            'm3_peak_mod'))
 
                         # 获取主设备
                         main_apsa_id = apsa.daily_bind
@@ -1108,7 +1108,8 @@ class DailyModModelView(RetrieveUpdateViewSet):
                     daily_mod.lin_tot_mod = lin_tot
             else:
                 daily_mod.lin_tot_mod = request.data.get('lin_tot_mod')
-        except Exception:
+        except Exception as e:
+            print(e)
             return JResp("daily联动lintot计算错误", 400)
 
         try:

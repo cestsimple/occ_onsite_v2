@@ -1418,11 +1418,20 @@ class CreateRecord(View):
             return JResp("参数不齐全", 400)
 
         try:
-            Record.objects.update_or_create(
-                variable_id=v_id,
-                value=float(value),
-                time=dt
-            )
+            r = Record.objects.filter(variable_id=v_id, time=dt)
+            if r.count() == 0:
+                Record.objects.create(
+                    variable_id=v_id,
+                    value=round(float(value), 2),
+                    time=dt
+                )
+            else:
+                r.delete()
+                Record.objects.create(
+                    variable_id=v_id,
+                    value=round(float(value), 2),
+                    time=dt
+                )
         except Exception as e:
             print(e)
             return JResp("创建失败，数据格式类型错误", 400)

@@ -1,5 +1,6 @@
-import json
+import getpass
 import threading
+import time
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
@@ -914,7 +915,7 @@ class DailyModelView(ListUpdateViewSet):
     # 指定分页器
     pagination_class = PageNum
     # 权限
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         # 重写，添加条件过滤功能
@@ -946,29 +947,100 @@ class DailyModelView(ListUpdateViewSet):
         return self.queryset
 
     def list(self, request):
+        # 获取参数
         try:
-            queryset = self.filter_queryset(self.get_queryset())
+            queryset = self.filter_queryset(self.get_queryset().prefetch_related('apsa__asset__site'))
         except Exception as e:
             print(e)
             return JResp("查询参数错误", 400)
 
-        try:
-            page = self.paginate_queryset(queryset)
-            if page is not None:
-                serializer = self.get_serializer(page, many=True)
-                res = self.generate_daily_data(serializer.data)
-                return self.get_paginated_response(res)
-        except Exception as e:
-            print(e)
-            return JResp("分页失败", 400)
+        # 分页
+        page = self.request.query_params.get('page')
+        pagesize = self.request.query_params.get('pagesize')
+        if not page:
+            page = 1
+        else:
+            page = int(page)
+        if not pagesize:
+            pagesize = 10
+        else:
+            pagesize = int(pagesize)
+        count = queryset.count()
+        queryset = queryset[(page-1) * pagesize: page * pagesize]
 
-        try:
-            serializer = self.get_serializer(queryset, many=True)
-            res = self.generate_daily_data(serializer.data)
-        except Exception:
-            return JResp("序列化Daily记录失败", 400)
+        # 拼接响应体
+        merge_list = self.merge_daily(queryset)
+        rsp = {
+            'total': count,
+            'page': page,
+            'pages': pagesize,
+            'list': merge_list
+        }
+        return JResp('ok', 200, rsp)
 
-        return JResp(data=res)
+    def merge_daily(self, queryset: list):
+        res_list = []
+        q: Daily
+        site: Site = Site()
+        asset: Asset = Asset()
+        mod: DailyMod = DailyMod()
+        apsa_id: int = 0
+        for q in queryset:
+            # 获取资产，气站
+            if apsa_id != q.apsa:
+                site = Site.objects.get(asset__apsa=q.apsa)
+                asset = Asset.objects.get(apsa=q.apsa)
+                mod = DailyMod.objects.get(date=q.date, apsa=q.apsa)
+
+            # 聚合数据
+            h_prod = q.h_prod + mod.h_prod_mod
+            h_stop = q.h_stpal + q.h_stp400v + q.h_stpdft + mod.h_stpal_mod + mod.h_stpdft_mod + mod.h_stp400v_mod
+            h_missing = 24 - h_stop - h_prod
+            m3_prod = q.m3_prod + mod.m3_prod_mod
+            avg_prod = m3_prod / h_prod if h_prod else 0
+            cus_consume = q.m3_tot + mod.m3_tot_mod
+            avg_consume = cus_consume / 24
+            peak = q.m3_peak + mod.m3_peak_mod
+            v_peak = q.m3_q5 + mod.m3_q5_mod
+            lin_tot = q.lin_tot + mod.lin_tot_mod - q.flow_meter - mod.flow_meter_mod
+            dif_peak = v_peak - peak
+            lin_consume = q.m3_q6 + mod.m3_q6_mod + q.m3_q7 + mod.m3_q7_mod
+            if q.apsa.cooling_fixed and q.apsa.daily_js == 2:
+                cooling = q.apsa.cooling_fixed
+            else:
+                cooling = ((lin_tot - peak - lin_consume) / m3_prod * 100) if m3_prod else 0
+            filling = q.filling * 0.65 * (q.apsa.temperature + 273.15) / 273.15
+
+            # 添加数据
+            res_list.append({
+                'id': q.id,
+                'date': q.date.strftime("%Y-%m-%d"),
+                'region': site.engineer.region if site.engineer else '',
+                'series': q.apsa.onsite_series,
+                'rtu_name': asset.rtu_name,
+                'norminal': q.apsa.norminal_flow,
+                'h_prod': round(h_prod, 2),
+                'h_stop': round(h_stop, 2),
+                'h_missing': round(h_missing, 2),
+                'm3_prod': round(m3_prod, 2),
+                'avg_prod': round(avg_prod, 2),
+                'cus_consume': round(cus_consume, 2),
+                'avg_consume': round(avg_consume, 2),
+                'peak': round(peak, 2),
+                'v_peak': round(v_peak, 2),
+                'lin_tot': round(lin_tot, 2),
+                'dif_peak': round(dif_peak, 2),
+                'lin_consume': round(lin_consume, 2),
+                'mod_id': mod.id,
+                'cooling': round(cooling, 2),
+                'filling': round(filling, 2),
+                'vap_max': round(q.apsa.vap_max, 2),
+                'success': q.success,
+                'confirm': q.confirm,
+                'mark': q.apsa.mark,
+                'comment': mod.comment,
+            })
+        return res_list
 
     def update(self, request, pk):
         try:
@@ -983,67 +1055,6 @@ class DailyModelView(ListUpdateViewSet):
         except Exception:
             return JResp("记录存储失败", 400)
         return JResp()
-
-    def generate_daily_data(self, daily_origin_list):
-        res_list = []
-        for d in daily_origin_list:
-            # 获取资产，气站
-            site = Site.objects.get(asset__apsa__id=d['apsa'])
-            asset = Asset.objects.get(apsa__id=d['apsa'])
-            apsa = Apsa.objects.get(id=d['apsa'])
-            mod = DailyMod.objects.get(date=d['date'], apsa__id=d['apsa'])
-            # 创建内容
-            h_prod = d['h_prod'] + mod.h_prod_mod
-            h_stop = d['h_stpal'] + d['h_stp400v'] + d[
-                'h_stpdft'] + mod.h_stpal_mod + mod.h_stpdft_mod + mod.h_stp400v_mod
-            h_missing = 24 - h_stop - h_prod
-            m3_prod = d['m3_prod'] + mod.m3_prod_mod
-            avg_prod = m3_prod / h_prod if h_prod else 0
-            cus_consume = d['m3_tot'] + mod.m3_tot_mod
-            avg_consume = cus_consume / 24
-            peak = d['m3_peak'] + mod.m3_peak_mod
-            v_peak = d['m3_q5'] + mod.m3_q5_mod
-            lin_tot = d['lin_tot'] + mod.lin_tot_mod - d['flow_meter'] - mod.flow_meter_mod
-            dif_peak = v_peak - peak
-            lin_consume = d['m3_q6'] + mod.m3_q6_mod + d['m3_q7'] + mod.m3_q7_mod
-            mod_id = mod.id
-            if apsa.cooling_fixed and apsa.daily_js == 2:
-                cooling = apsa.cooling_fixed
-            else:
-                cooling = ((lin_tot - peak - lin_consume) / m3_prod * 100) if m3_prod else 0
-            filling = d['filling'] * 0.65 * (apsa.temperature + 273.15) / 273.15
-
-            # 添加数据
-            res_list.append({
-                'id': d['id'],
-                'date': d['date'].split(' ')[0],
-                'region': site.engineer.region if site.engineer else '',
-                'series': apsa.onsite_series,
-                'rtu_name': asset.rtu_name,
-                'norminal': apsa.norminal_flow,
-                'h_prod': round(h_prod, 2),
-                'h_stop': round(h_stop, 2),
-                'h_missing': round(h_missing, 2),
-                'm3_prod': round(m3_prod, 2),
-                'avg_prod': round(avg_prod, 2),
-                'cus_consume': round(cus_consume, 2),
-                'avg_consume': round(avg_consume, 2),
-                'peak': round(peak, 2),
-                'v_peak': round(v_peak, 2),
-                'lin_tot': round(lin_tot, 2),
-                'dif_peak': round(dif_peak, 2),
-                'lin_consume': round(lin_consume, 2),
-                'mod_id': round(mod_id, 2),
-                'cooling': round(cooling, 2),
-                'filling': round(filling, 2),
-                'vap_max': round(apsa.vap_max, 2),
-                'success': d['success'],
-                'confirm': d['confirm'],
-                'mark': apsa.mark,
-                'comment': mod.comment,
-            })
-
-        return res_list
 
 
 class DailyModModelView(RetrieveUpdateViewSet):
@@ -1237,7 +1248,7 @@ class MalfunctionModelView(ModelViewSet):
     # 指定分页器
     pagination_class = PageNum
     # 权限
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         # 重写，添加条件过滤功能
@@ -1851,56 +1862,79 @@ class MalfunctionLock(APIView):
         return Response(status=200, data="ok")
 
 
-class DailyImportView(View):
-    def post(self, request):
-        try:
-            apsa_id = request.POST.get("apsa_id")
-            date = request.POST.get("date")
-            h_prod = request.POST.get("h_prod")
-            h_stpal = request.POST.get("h_stpal")
-            h_stpdft = request.POST.get("h_stpdft")
-            h_stp400v = request.POST.get("h_stp400v")
-            m3_prod = request.POST.get("m3_prod")
-            m3_tot = request.POST.get("m3_tot")
-            m3_peak = request.POST.get("m3_peak")
-            m3_q1 = request.POST.get("m3_q1")
-            m3_q6 = request.POST.get("m3_q6")
-            m3_q5 = request.POST.get("m3_q5")
-            m3_q7 = request.POST.get("m3_q7")
-            filling = request.POST.get("filling")
-            lin_tot = request.POST.get("lin_tot")
-        except Exception as e:
-            return JResp(status=400, msg="参数错误")
-
-        try:
-            # 创建daily数据
-            Daily.objects.update_or_create(
-                apsa_id=apsa_id,
-                date=date,
-                h_prod=h_prod,
-                h_stpal=h_stpal,
-                h_stpdft=h_stpdft,
-                h_stp400v=h_stp400v,
-                m3_prod=m3_prod,
-                m3_tot=m3_tot,
-                m3_peak=m3_peak,
-                m3_q1=m3_q1,
-                m3_q5=m3_q5,
-                m3_q6=m3_q6,
-                m3_q7=m3_q7,
-                filling=filling,
-                lin_tot=lin_tot,
-                flow_meter=0,
-                success=1,
-            )
-
-            # 创建daily_mod
-            DailyMod.objects.update_or_create(
-                apsa_id=apsa_id,
-                date=date,
-                user="system"
-            )
-        except Exception:
-            return JResp(status=500, msg=f"创建失败 {date} - {apsa_id}")
-
-        return JResp()
+# class DailyImport(View):
+#     """import daily from local file"""
+#     def get(self, request):
+#         # 读取csv文件
+#         file_path = rf"C:/Users/SVC_TF33_API_USER/Desktop/Projects/onsite_v2/daily.csv"
+#         #file_path = rf"C:/Users/xiangzhe.hou/Desktop/daily.csv"
+#         lines = []
+#         with open(file_path, newline="", encoding="utf-8") as file:
+#             flag = 0
+#             for line in file.readlines():
+#                 if flag == 0:
+#                     flag = 1
+#                 else:
+#                     lines.append(line.split(","))
+#
+#         # 读取apsa信息
+#         apsa_info = {}
+#         for apsa in Apsa.objects.all():
+#             rtu_name = apsa.asset.rtu_name
+#             apsa_info[rtu_name] = apsa.id
+#         apsa_rtu_name_keys = apsa_info.keys()
+#         success = 0
+#         error = 0
+#         error_lines = []
+#         # 删除旧数据
+#         Daily.objects.filter(date__lt='2022-05-21 00:00:00').delete()
+#         DailyMod.objects.filter(date__lt='2022-05-21 00:00:00').delete()
+#         daily_create_list = []
+#         daily_mod_create_list = []
+#         # 创建daily数据
+#         for r in lines:
+#             rtu_name = r[4].strip()
+#             if rtu_name in apsa_rtu_name_keys:
+#                 apsa_id = apsa_info[r[4].strip()]
+#                 date = r[3] if r[3] != "NULL" and r[3] != "" else 0
+#                 try:
+#                     # 创建daily数据
+#                     daily_create_list.append(Daily(
+#                         apsa_id=apsa_id,
+#                         date=date,
+#                         h_prod=r[6] if r[6] != "NULL" and r[6] != "" else 0,
+#                         h_stpal=r[21] if r[21] != "NULL" and r[21] != "" else 0,
+#                         h_stpdft=r[22] if r[22] != "NULL" and r[22] != "" else 0,
+#                         h_stp400v=r[23] if r[23] != "NULL" and r[23] != "" else 0,
+#                         m3_prod=r[8] if r[8] != "NULL" and r[8] != "" else 0,
+#                         m3_tot=r[10] if r[10] != "NULL" and r[10] != "" else 0,
+#                         m3_peak=r[12] if r[12] != "NULL" and r[12] != "" else 0,
+#                         m3_q1=r[20] if r[20] != "NULL" and r[20] != "" else 0,
+#                         m3_q5=r[13] if r[13] != "NULL" and r[13] != "" else 0,
+#                         m3_q6=r[24] if r[24] != "NULL" and r[24] != "" else 0,
+#                         m3_q7=r[25] if r[25] != "NULL" and r[25] != "" else 0,
+#                         filling=r[19] if r[19] != "NULL" and r[19] != "" else 0,
+#                         lin_tot=r[14] if r[14] != "NULL" and r[14] != "" else 0,
+#                         flow_meter=0,
+#                         success=1,
+#                     ))
+#
+#                     # 创建daily_mod
+#                     daily_mod_create_list.append(DailyMod(
+#                         apsa_id=apsa_id,
+#                         date=date,
+#                         comment=r[26] if r[26] != "NULL" else "",
+#                         user="system"
+#                     ))
+#                     success += 1
+#                 except Exception:
+#                     error += 1
+#             else:
+#                 error += 1
+#
+#         # 批量写入
+#         t1 = datetime.now()
+#         Daily.objects.bulk_create(daily_create_list, batch_size=100)
+#         DailyMod.objects.bulk_create(daily_mod_create_list, batch_size=100)
+#         t2 = datetime.now()
+#         return JResp(msg=f"已完成，成功{success}个，失败{error}个，共{t2-t1}秒", status=200, data=None)

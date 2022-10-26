@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'apps.iot',
     'apps.onsite',
     'apps.ludan',
+    'apps.ticket',
     'corsheaders',
 ]
 

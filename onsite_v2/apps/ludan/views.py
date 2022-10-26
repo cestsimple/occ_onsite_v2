@@ -5,7 +5,7 @@ from .models import Car, ColumnSetting
 
 def exportCars(request):
     try:
-        cars = Car.objects.all()
+        cars = Car.objects.order_by('region', 'account', 'plate')
     except Exception:
         return JsonResponse({
             'status': 400,

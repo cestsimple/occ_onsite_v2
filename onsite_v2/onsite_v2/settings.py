@@ -17,7 +17,6 @@ import sys
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.2/howto/deployment/checklist/
 
@@ -28,7 +27,6 @@ SECRET_KEY = 'nma(4vjm!(b&l5(q@)4b3es*b#u-=!7w*l&ma46cjy*3ws&7!_'
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
-
 
 # Application definition
 
@@ -45,6 +43,7 @@ INSTALLED_APPS = [
     'apps.onsite',
     'apps.ludan',
     'apps.ticket',
+    'apps.iotv2',
     'corsheaders',
 ]
 
@@ -53,7 +52,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    #'django.middleware.csrf.CsrfViewMiddleware',
+    # 'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -96,7 +95,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'onsite_v2.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 
@@ -115,16 +113,15 @@ DATABASES = {
     #     }
     # }
     'default': {
-        'ENGINE': 'django.db.backends.mysql', # 数据库引擎
-        #'HOST': 'localhost', # 数据库主机
+        'ENGINE': 'django.db.backends.mysql',  # 数据库引擎
+        # 'HOST': 'localhost', # 数据库主机
         'HOST': 'localhost',
-        'PORT': 3306, # 数据库端口
-        'USER': 'django_iot', # 数据库用户名
-        'PASSWORD': 'welcome', # 数据库用户密码
-        'NAME': 'IOT_v2' # 数据库名字
+        'PORT': 3306,  # 数据库端口
+        'USER': 'django_iot',  # 数据库用户名
+        'PASSWORD': 'welcome',  # 数据库用户密码
+        'NAME': 'IOT_v2'  # 数据库名字
     },
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
@@ -144,7 +141,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/2.2/topics/i18n/
 
@@ -159,7 +155,6 @@ USE_L10N = True
 # 修改后mysql时区统一
 USE_TZ = False
 
-
 # static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
@@ -171,24 +166,21 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static/'),
 ]
 
-
 # 配置规则 '应用名.模型类名'
 AUTH_USER_MODEL = 'user.User'
 
-
 # 使用LoginMixin需要定义默认登录跳转URL
 LOGIN_URL = '/user/login/'
-
 
 # 配置时间格式，解决中间带T的问题
 REST_FRAMEWORK = {
     'DATETIME_FORMAT': "%Y-%m-%d %H:%M",
     'EXCEPTION_HANDLER': 'utils.drf.exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
-            'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
-            'rest_framework.authentication.SessionAuthentication',
-            'rest_framework.authentication.BasicAuthentication',
-        ),
+        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ),
 }
 JWT_AUTH = {
     'JWT_EXPIRATION_DELTA': datetime.timedelta(days=7),
@@ -208,4 +200,3 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
-

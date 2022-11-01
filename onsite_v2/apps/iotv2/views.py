@@ -4,13 +4,14 @@ from datetime import datetime, timedelta
 
 import requests
 from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.views import View
 from pycognito import Cognito
 
 from apps.iot.models import AsyncJob
-from utils import jobs, JResp
-from .models import AssetV2, VariableV2
+from utils import jobs, JResp, pagination
+from .models import AssetV2, VariableV2, ApsaV2
 
 URL = 'https://bos.iot.airliquide.com/api/v1'
 
@@ -164,3 +165,75 @@ class AssetRefresh(View):
         a.name = asset['name'],
         a.site_name = asset['site']['name']
         a.save()
+
+
+def apsa_list(c):
+    if c.method == 'GET':
+        page = c.GET.get('page')
+        pagesize = c.GET.get('pagesize')
+        region = c.GET.get('region')
+        group = c.GET.get('group')
+        name = c.GET.get('name')
+
+        # 过滤
+        query_set = ApsaV2.objects.all()
+        if region:
+            query_set = query_set.filter(region=region)
+        if group:
+            query_set = query_set.filter(group=group)
+        if name:
+            name = name.strip().upper()
+            if "CN_" in name:
+                query_set = query_set.filter(Q(rtu_name=name) | Q(name=name))
+            else:
+                query_set = query_set.filter(Q(rtu_name__contains=name) | Q(name__contains=name))
+        # 分页
+        if not all([page, pagesize]):
+            page = 1
+            pagesize = 10
+        else:
+            page = int(page)
+            pagesize = int(pagesize)
+        p = pagination.paginator(page, pagesize, query_set)
+        # 序列化
+        res = []
+        q: ApsaV2
+        for q in p['list']:
+            res.append({
+                'id': q.id,
+                'name': q.name,
+                'rtu_name': q.rtu_name,
+                'region': q.region,
+                'group': q.group,
+                'engineer': q.engineer.first_name,
+                'comment': q.comment,
+                'onsite_type': q.onsite_type,
+                'onsite_series': q.onsite_series,
+                'facility_fin': q.facility_fin,
+                'temperature': q.temperature,
+                'vap_max': q.vap_max,
+                'vap_type': q.vap_type,
+                'norminal_flow': q.norminal_flow,
+                'daily_bind': q.daily_bind,
+                'cooling_fixed': q.cooling_fixed,
+                'mark': q.mark,
+                'daily_js': q.daily_js,
+                'm3_q7': q.m3_q7,
+                'm3_q6': q.m3_q6,
+                'm3_q5': q.m3_q5,
+                'm3_q1': q.m3_q1,
+                'm3_prod': q.m3_prod,
+                'm3_peak': q.m3_peak,
+                'm3_tot': q.m3_tot,
+                'h_stpdft': q.h_stpdft,
+                'h_stpal': q.h_stpal,
+                'h_stp400v': q.h_stp400v,
+                'h_prod': q.h_prod,
+                'flow_meter': q.flow_meter,
+                'status': q.status,
+                'created_at': q.created_at,
+                'updated_at': q.updated_at,
+            })
+        # 返回响应
+        p['list'] = res
+        return JResp('ok', 200, p)

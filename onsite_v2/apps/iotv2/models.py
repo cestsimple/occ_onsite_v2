@@ -63,6 +63,7 @@ class ApsaV2(models.Model):
     name = models.CharField(max_length=50, verbose_name='资产名')
     rtu_name = models.CharField(max_length=50, verbose_name='RTU名', default='')
     region = models.CharField(max_length=20, verbose_name='区域', default='')
+    group = models.CharField(max_length=20, verbose_name='分组', default='')
     engineer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     comment = models.CharField(max_length=50, verbose_name='备注', default='')
     # apsa字段

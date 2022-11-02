@@ -25,5 +25,6 @@ urlpatterns = [
     url(r'^api/', include(('apps.user.urls', 'users'), namespace='users')),
     url(r'^api/', include(('apps.onsite.urls', 'onsite'), namespace='onsite')),
     url(r'^api/', include(('apps.ticket.urls', 'ticket'), namespace='ticket')),
+    url(r'^api/v2/', include(('apps.iotv2.urls', 'iotv2'), namespace='iotv2')),
     url(r'^$', TemplateView.as_view(template_name="index.html")),
 ]

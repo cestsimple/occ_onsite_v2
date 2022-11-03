@@ -8,10 +8,13 @@ from django.db.models import Q
 from django.http import JsonResponse
 from django.views import View
 from pycognito import Cognito
+from rest_framework.generics import ListAPIView
 
-from apps.iot.models import AsyncJob
-from utils import jobs, JResp, pagination
+from apps.iot.models import AsyncJob, Asset
+from utils import jobs, JResp
+from utils.pagination import PageNum
 from .models import AssetV2, VariableV2, ApsaV2
+from .serializer import AssetV2Serializer
 
 URL = 'https://bos.iot.airliquide.com/api/v1'
 
@@ -167,73 +170,102 @@ class AssetRefresh(View):
         a.save()
 
 
-def apsa_list(c):
-    if c.method == 'GET':
-        page = c.GET.get('page')
-        pagesize = c.GET.get('pagesize')
-        region = c.GET.get('region')
-        group = c.GET.get('group')
-        name = c.GET.get('name')
+class ApsaV2View(ListAPIView):
+    queryset = ApsaV2.objects.all()
+    # 序列化器
+    serializer_class = AssetV2Serializer
+    # 权限
+    # permission_classes = [IsAuthenticated]
+    # 分页器
+    pagination_class = PageNum
 
-        # 过滤
-        query_set = ApsaV2.objects.all()
+    def get_queryset(self):
+        region = self.request.query_params.get('region')
+        group = self.request.query_params.get('group')
+        name = self.request.query_params.get('name')
+        queryset = ApsaV2.objects.all()
         if region:
-            query_set = query_set.filter(region=region)
+            queryset = queryset.filter(status=region)
         if group:
-            query_set = query_set.filter(group=group)
+            queryset = queryset.filter(status=group)
         if name:
             name = name.strip().upper()
             if "CN_" in name:
-                query_set = query_set.filter(Q(rtu_name=name) | Q(name=name))
+                queryset = queryset.filter(Q(rtu_name=name) | Q(name=name))
             else:
-                query_set = query_set.filter(Q(rtu_name__contains=name) | Q(name__contains=name))
-        # 分页
-        if not all([page, pagesize]):
-            page = 1
-            pagesize = 10
-        else:
-            page = int(page)
-            pagesize = int(pagesize)
-        p = pagination.paginator(page, pagesize, query_set)
-        # 序列化
-        res = []
-        q: ApsaV2
-        for q in p['list']:
-            res.append({
-                'id': q.id,
-                'name': q.name,
-                'rtu_name': q.rtu_name,
-                'region': q.region,
-                'group': q.group,
-                'engineer': q.engineer.first_name,
-                'comment': q.comment,
-                'onsite_type': q.onsite_type,
-                'onsite_series': q.onsite_series,
-                'facility_fin': q.facility_fin,
-                'temperature': q.temperature,
-                'vap_max': q.vap_max,
-                'vap_type': q.vap_type,
-                'norminal_flow': q.norminal_flow,
-                'daily_bind': q.daily_bind,
-                'cooling_fixed': q.cooling_fixed,
-                'mark': q.mark,
-                'daily_js': q.daily_js,
-                'm3_q7': q.m3_q7,
-                'm3_q6': q.m3_q6,
-                'm3_q5': q.m3_q5,
-                'm3_q1': q.m3_q1,
-                'm3_prod': q.m3_prod,
-                'm3_peak': q.m3_peak,
-                'm3_tot': q.m3_tot,
-                'h_stpdft': q.h_stpdft,
-                'h_stpal': q.h_stpal,
-                'h_stp400v': q.h_stp400v,
-                'h_prod': q.h_prod,
-                'flow_meter': q.flow_meter,
-                'status': q.status,
-                'created_at': q.created_at,
-                'updated_at': q.updated_at,
-            })
-        # 返回响应
-        p['list'] = res
-        return JResp('ok', 200, p)
+                queryset = queryset.filter(Q(rtu_name__contains=name) | Q(name__contains=name))
+        return queryset
+
+
+class AssetV2View(ListAPIView):
+    queryset = AssetV2.objects.all()
+    # 序列化器
+    serializer_class = AssetV2Serializer
+    # 权限
+    # permission_classes = [IsAuthenticated]
+    # 分页器
+    pagination_class = PageNum
+
+    def get_queryset(self):
+        name = self.request.query_params.get('name')
+        status = self.request.query_params.get('status')
+        queryset = AssetV2.objects.all()
+        if status:
+            queryset = queryset.filter(status=status)
+        if name:
+            name = name.strip()
+            queryset = queryset.filter(site_name__contains=name)
+
+        return queryset
+
+
+def migrate_asset() -> int:
+    query_set = Asset.objects.filter(tags='onsite')
+    q: Asset
+    rows_affected: int = 0
+    for q in query_set:
+        rows_affected += 1
+        AssetV2.objects.create(
+            uuid=q.uuid,
+            name=q.name,
+            site_name=q.site.name,
+            status=0
+        )
+    return rows_affected
+
+
+def migrate_variable() -> int:
+    rows_affected: int = 0
+
+    a: AssetV2
+    for a in AssetV2.objects.all():
+        url = f'{URL}/assets/{a.uuid}/variables?limit=1000'
+        variables = requests.get(url, headers=get_cognito()).json()["content"]
+        v_list = []
+        for v in variables:
+            rows_affected += 1
+            v_list.append(VariableV2(
+                uuid=v["id"],
+                name=v["name"],
+                asset_uuid=a.uuid,
+            ))
+        VariableV2.objects.bulk_create(v_list, batch_size=100)
+    return rows_affected
+
+
+def migrate_apsa() -> int:
+    rows_affected: int = 0
+    return rows_affected
+
+
+def migrate(c):
+    item: str = c.GET.get('item')
+    rows_affected: int = 0
+    if item == 'asset':
+        rows_affected = migrate_asset()
+    elif item == 'variable':
+        rows_affected = migrate_variable()
+    elif item == 'apsa':
+        rows_affected = migrate_apsa()
+
+    return JResp(msg=f"rows_affected: {rows_affected}")

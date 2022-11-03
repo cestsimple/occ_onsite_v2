@@ -37,6 +37,8 @@ def paginator(page: int = 1, pagesize: int = 10, query_set: QuerySet = None) -> 
     # 分情况返回
     start = (page - 1) * pagesize + 1
     end = page * pagesize
+    q = query_set[start, end]
+    print(q)
     if end < total:
         return {'total': total, 'list': query_set[start, end], 'page': page, 'pagesize': pagesize}
     elif start <= total < end:

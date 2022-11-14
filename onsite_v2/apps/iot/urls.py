@@ -1,4 +1,5 @@
 from django.conf.urls import url
+
 from . import views
 
 urlpatterns = [
@@ -40,11 +41,6 @@ urlpatterns = [
     url(r'^asyncjob/$', views.AsyncJobModelView.as_view({'get': 'list'})),
     url(r'^asyncjob/(?P<pk>\d+)/$', views.AsyncJobModelView.as_view({'delete': 'destroy'})),
     url(r'^asyncjob/clear/$', views.AsyncJobModelView.as_view({'get': 'clear'})),
-
-    # delete dup
-    url(r'^dup/site/', views.DeleteSiteDup.as_view()),
-    url(r'^dup/asset/', views.DeleteAssetDup.as_view()),
-    url(r'^dup/variable/', views.DeleteVariableDup.as_view()),
 
     # 查询UUID
     url(r'^uuid/$', views.GetUUID.as_view()),

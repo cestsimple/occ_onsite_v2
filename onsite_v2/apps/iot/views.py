@@ -2,8 +2,12 @@
 import re
 import threading
 import time
+from datetime import datetime, timedelta
+from itertools import chain
+
 import requests
 from django.db import DatabaseError
+from django.db.models import Q
 from django.http import JsonResponse
 from django.views import View
 from pycognito import Cognito
@@ -12,19 +16,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
-import uuid as uuid_gen
-from itertools import chain
 
+from utils import jobs, JResp
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
 from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record, OriginAssetData
-from datetime import datetime, timedelta
-from utils import jobs, JResp
 from .serializer import SiteSerializer, ApsaSerializer, BulkSerializer, VariableSerializer, AssetApsaSerializer, \
     AssetBulkSerializer, AsyncJobSerializer
 from ..onsite.models import MonthlyVariable
 from ..user.models import User
-from django.db.models import Q
 
 URL = 'https://bos.iot.airliquide.com/api/v1'
 
@@ -638,13 +638,16 @@ class RecordData(View):
         # 获取assets对应变量,去除没有dailymark的
         for asset in self.assets:
             # 获取所有daily和monthly变量去重
-            variables_daily = [x['id'] for x in Variable.objects.filter(asset=asset, confirm__gt=-1).filter(~Q(daily_mark='')).values('id')]
-            variables_monthly = [x['variable_id'] for x in MonthlyVariable.objects.filter(apsa__asset=asset).values('variable_id')]
+            variables_daily = [x['id'] for x in
+                               Variable.objects.filter(asset=asset, confirm__gt=-1).filter(~Q(daily_mark='')).values(
+                                   'id')]
+            variables_monthly = [x['variable_id'] for x in
+                                 MonthlyVariable.objects.filter(apsa__asset=asset).values('variable_id')]
             variables = set(chain(variables_daily, variables_monthly))
             self.variables += variables
 
         total = len(self.variables)
-        print(f"共:{total}个变量,预计{int(total*11.6)}条记录")
+        print(f"共:{total}个变量,预计{int(total * 11.6)}条记录")
         # 分发任务至子线程
         multi_thread_task(multi_num=12, target_task=self.refresh_sub, task_args=(self.variables, h))
         # 更新job状态
@@ -747,7 +750,7 @@ class RecordData(View):
             # IOT系统时间未UTC，会把我们的时间+8返回
             yesterday = (t + timedelta(days=-1)).strftime("%Y-%m-%d")
             self.start = (t + timedelta(days=-2)).strftime("%Y-%m-%d") + 'T15:55:00.000Z'
-            self.end =  yesterday + 'T16:05:00.000Z'
+            self.end = yesterday + 'T16:05:00.000Z'
             self.time_list = [yesterday, yesterday]
         else:
             self.start = (datetime.strptime(self.time_list[0], "%Y-%m-%d") + timedelta(days=-1)).strftime(
@@ -774,72 +777,6 @@ class RecordData(View):
         records = Record.objects.filter(time__range=time_range, variable__asset__in=self.assets)
         if records.count() != 0:
             records.delete()
-
-
-class DeleteSiteDup(View):
-    def get(self, request):
-        # 获取unique uuid
-        uuid_list = set([x.uuid for x in Site.objects.all()])
-
-        delete_list = []
-
-        # 遍历uuid获取所有
-        for uuid in uuid_list:
-            sites = Site.objects.filter(uuid=uuid)
-            if sites.count() != 1:
-                print(f"重复了：{uuid}")
-                # 若同uuid的site不唯一
-                for site in sites:
-                    # 如果site未被关联过asset的外键
-                    if Asset.objects.filter(site=site).count() == 0:
-                        # 添加到删除列表
-                        site.delete()
-                        delete_list.append(uuid)
-
-        return JsonResponse({'msg': f"共有{len(delete_list)}个重复气站，可以被删除"})
-
-
-class DeleteAssetDup(View):
-    def get(self, request):
-        # 获取unique uuid
-        uuid_list = set([x.uuid for x in Asset.objects.all()])
-
-        delete_list = []
-        # 遍历uuid获取所有
-        for uuid in uuid_list:
-            assets = Asset.objects.filter(uuid=uuid).order_by('id')
-            count = assets.count()
-            if count != 1:
-                if count == 2:
-                    a = assets[1]
-                    print(a.id)
-                    vs = Variable.objects.filter(asset=a)
-                    for v in vs:
-                        v.delete()
-                    a.uuid = str(uuid_gen.uuid4())
-                    a.save()
-                else:
-                    print(uuid)
-                delete_list.append(uuid)
-        return JsonResponse({'msg': f"共有{len(delete_list)}个重复ASSET可以被删除"})
-
-
-class DeleteVariableDup(View):
-    def get(self, request):
-        # 获取unique uuid
-        uuid_list = set([x.uuid for x in Variable.objects.all()])
-
-        print(f"共{len(uuid_list)}个UUID")
-        delete_list = []
-        # 遍历uuid获取所有
-        for uuid in uuid_list:
-            vs = Variable.objects.filter(uuid=uuid).order_by('id')
-            if count := vs.count() != 1:
-                print(vs[0].asset_id)
-                if count == 2:
-                    print(uuid)
-                delete_list.append(uuid)
-        return JsonResponse({'msg': f"共有{len(delete_list)}个重复Variable可以被删除"})
 
 
 class SiteModelView(UpdateListRetrieveViewSet):
@@ -1375,7 +1312,7 @@ class KillRecordTaskView(View):
             job.result = 'ERROR: killed by api request'
             job.finish_time = datetime.now()
             job.save()
-        return JsonResponse({"status": 200, 'msg': 'ok', 'affected rows': len(sub_jobs+1)})
+        return JsonResponse({"status": 200, 'msg': 'ok', 'affected rows': len(sub_jobs + 1)})
 
 
 class GetUUID(View):

@@ -6,12 +6,12 @@ from datetime import datetime, timedelta
 from itertools import chain
 
 import requests
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from django.db import DatabaseError
 from django.db.models import Q
 from django.http import JsonResponse
 from django.views import View
 from pycognito import Cognito
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -653,7 +653,7 @@ class RecordData(View):
         total = len(self.variables)
         print(f"共:{total}个变量,预计{int(total * 11.6)}条记录")
         # 分发任务至子线程
-        multi_thread_task(multi_num=12, target_task=self.refresh_sub, task_args=(self.variables, h))
+        multi_thread_task(multi_num=15, target_task=self.refresh_sub, task_args=(self.variables, h))
         # 更新job状态
         jobs.update('IOT_RECORD', 'OK')
 
@@ -689,7 +689,7 @@ class RecordData(View):
 
             # 获取数据
             try:
-                res = requests.get(url, headers=h, timeout=3)
+                res = requests.get(url, headers=h, timeout=3, verify=False)
                 if res.status_code == 401:
                     return
                 if res.status_code == 403:

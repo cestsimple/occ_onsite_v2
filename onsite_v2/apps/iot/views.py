@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from itertools import chain
 
 import requests
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from django.db import DatabaseError
 from django.db.models import Q
 from django.http import JsonResponse
@@ -27,6 +28,9 @@ from ..onsite.models import MonthlyVariable
 from ..user.models import User
 
 URL = 'https://bos.iot.airliquide.com/api/v1'
+
+# 禁用requests warning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 def get_cognito():
@@ -50,7 +54,7 @@ def get_cognito():
 
     # 申请token
     username = 'xiangzhe.hou@airliquide.com'
-    password = 'ZXCzxc1234!'
+    password = 'ZXCzxc123!'
     user = Cognito(
         user_pool_id='eu-west-1_XxAZFKMzE',
         client_id='oppih8pblveb0qb27sl8k9ubc',

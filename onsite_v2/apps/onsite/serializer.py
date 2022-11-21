@@ -1,4 +1,5 @@
 from rest_framework import serializers
+
 from .models import Filling, Daily, DailyMod, Malfunction, FillingMonthly, MonthlyVariable, InvoiceDiff, ReasonDetail
 from ..iot.models import Asset, Apsa
 
@@ -18,7 +19,7 @@ class FillingSerializer(serializers.ModelSerializer):
             apsa = Apsa.objects.get(asset__rtu_name=rtu_name, asset__confirm=1)
             return round(obj.quantity * 0.65 * (apsa.temperature + 273.15) / 273.15, 2)
         except Exception as e:
-            return e[:100]
+            return e.__str__()[:100]
 
     def get_asset_name(self, obj):
         return Asset.objects.get(bulk=obj.bulk).name
@@ -143,7 +144,7 @@ class FillingMonthlySerializer(serializers.ModelSerializer):
         return round((obj.start - obj.end) * obj.bulk.tank_size / 100, 2)
 
     def get_total(self, obj):
-        return round(obj.quantity + (obj.start - obj.end) * obj.bulk.tank_size / 100 ,2)
+        return round(obj.quantity + (obj.start - obj.end) * obj.bulk.tank_size / 100, 2)
 
     class Meta:
         model = FillingMonthly

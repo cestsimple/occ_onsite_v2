@@ -118,14 +118,14 @@ class SiteData(View):
         # 设置请求信息
         header = get_cognito()
         url = URL + '/sites?limit=1000&page=0'
-        res = requests.get(url, headers=header).json()
+        res = requests.get(url, headers=header, verify=False).json()
         page_max = res['page']['maxPage']
         contents = res['content']
         # 获取全部页数
         if page_max != 0:
             for i in range(1, page_max + 1):
                 url = f'{URL}/sites?limit=1000&page={i}'
-                res = requests.get(url, headers=header).json()
+                res = requests.get(url, headers=header, verify=False).json()
                 contents += res['content']
 
         # 分类Site
@@ -202,14 +202,14 @@ class AssetData(View):
         # 设置请求信息
         header = get_cognito()
         url = URL + '/assets?limit=1000&page=0'
-        res = requests.get(url, headers=header).json()
+        res = requests.get(url, headers=header, verify=False).json()
         page_max = res['page']['maxPage']
         contents = res['content']
         # 获取全部页数
         if page_max != 0:
             for i in range(1, page_max + 1):
                 url = f'{URL}/assets?limit=1000&page={i}'
-                res = requests.get(url, headers=header).json()
+                res = requests.get(url, headers=header, verify=False).json()
                 contents += res['content']
 
         # 分类
@@ -334,7 +334,7 @@ class TagData(View):
         for asset in assets:
             try:
                 url = f'{URL}/assets/{asset.uuid}/tags'
-                res = requests.get(url, headers=h).json()
+                res = requests.get(url, headers=h, verify=False).json()
                 for tag in res['content']:
                     if tag['name'] == 'TECHNO':
                         tag_name = tag['labels'][0]['name']
@@ -434,7 +434,7 @@ class TagData(View):
             url = f'{URL}/sites/{site.uuid}/tags'
             site_old_engineer = site.engineer
             try:
-                res = requests.get(url, headers=h).json()
+                res = requests.get(url, headers=h, verify=False).json()
 
                 for tag in res['content']:
                     if tag['name'] != 'PHASE' and tag['name'] != 'BUSINESS_LINE':
@@ -515,7 +515,7 @@ class VariableData(View):
 
         for asset in assets:
             url = f'{URL}/assets/{asset.uuid}/variables?limit=1000'
-            res = requests.get(url, headers=h).json()
+            res = requests.get(url, headers=h, verify=False).json()
 
             # 反序列化
             variable_iot_dic = {}
@@ -1428,9 +1428,9 @@ class ManuelCreateAsset(View):
             return
 
         # 抓取资产信息
-        url: str = "https://bos.iot.airliquide.com/api/v1/assets/" + self.uuid
+        url: str = f"{URL}/assets/{self.uuid}"
         try:
-            self.res = requests.get(url, headers=get_cognito()).json()
+            self.res = requests.get(url, headers=get_cognito(), verify=False).json()
         except Exception as e:
             print(e)
             jobs.update("IOT_ASSET_MANUEL", "错误：向IOT请求asset或解析失败")
@@ -1475,19 +1475,12 @@ class ManuelCreateAsset(View):
             jobs.update("IOT_ASSET_MANUEL", "错误：Apsa/Bulk创建失败")
             return
 
-        # 抓取该资产的所有变量信息
-        try:
-            url = "https://bos.iot.airliquide.com/api/v1/assets/"
-        except Exception:
-            jobs.update("IOT_ASSET_MANUEL", "错误：向IOT请求variable或解析失败")
-            return
-
         # 检查变量uuid是否存在，并创建
         try:
             asset = Asset.objects.get(uuid=self.uuid)
             asset_name = asset.name
             url = f'{URL}/assets/{self.uuid}/variables?limit=1000'
-            res = requests.get(url, headers=get_cognito()).json()["content"]
+            res = requests.get(url, headers=get_cognito(), verify=False).json()["content"]
             for c in res:
                 variable_name = c["name"]
                 if Variable.objects.filter(uuid=c["id"]).count() == 0:

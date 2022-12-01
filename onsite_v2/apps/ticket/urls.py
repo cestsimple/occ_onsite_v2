@@ -22,10 +22,13 @@ urlpatterns = [
     # task
     url(r'^ticket/tasks/$', views.TaskView.as_view({'get': 'list', 'post': 'create'})),
     url(r'^ticket/task/(?P<pk>\d+)/$',
-        views.TaskView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
+        views.TaskView.as_view({'get': 'retrieve', 'put': 'update'})),
 
     # task history
     url(r'^ticket/task/history/$', views.TaskHistoryView.as_view({'post': 'create'})),
     url(r'^ticket/task/history/(?P<pk>\d+)/$',
         views.TaskHistoryView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
+
+    # custom api
+    url(r'^ticket/task/mytodo/', views.get_my_todo_tasks)
 ]

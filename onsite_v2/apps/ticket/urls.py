@@ -15,7 +15,17 @@ urlpatterns = [
         views.NodeView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 
     # node content
-    url(r'^ticket/node/contents/$', views.NodeContentView.as_view({'get': 'list', 'post': 'create'})),
+    url(r'^ticket/node/content/$', views.NodeContentView.as_view({'post': 'create'})),
     url(r'^ticket/node/content/(?P<pk>\d+)/$',
         views.NodeContentView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
+
+    # task
+    url(r'^ticket/tasks/$', views.TaskView.as_view({'get': 'list', 'post': 'create'})),
+    url(r'^ticket/task/(?P<pk>\d+)/$',
+        views.TaskView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
+
+    # task history
+    url(r'^ticket/task/history/$', views.TaskHistoryView.as_view({'post': 'create'})),
+    url(r'^ticket/task/history/(?P<pk>\d+)/$',
+        views.TaskHistoryView.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'})),
 ]

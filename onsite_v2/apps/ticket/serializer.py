@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 from rest_framework import serializers
 
-from .models import Project, Node, NodeContent
+from .models import Project, Node, NodeContent, Task
 
 
 # class FillingSerializer(serializers.ModelSerializer):
@@ -48,3 +48,15 @@ class NodeContentSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'type': {'allow_blank': True},
         }
+
+
+class TaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Task
+        fields = '__all__'
+
+
+class TaskHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Task
+        fields = '__all__'

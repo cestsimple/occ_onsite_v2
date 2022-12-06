@@ -2,6 +2,7 @@ from django.db import models
 
 REGION_CHOICES = [
     ('qp', '青浦'),
+    ('kj', '科举'),
     ('cg', '成功'),
     ('skid', '小罐车'),
     ('med', '医用氧'),
@@ -9,6 +10,7 @@ REGION_CHOICES = [
     ('pag', '可燃气'),
     ('skid_zj', '浙江小罐车'),
     ('skid_sh', '上海小罐车'),
+    ('nanjing', '南京'),
 ]
 
 ACCOUNT_CHOICES = [

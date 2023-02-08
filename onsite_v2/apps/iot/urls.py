@@ -34,7 +34,6 @@ urlpatterns = [
     url(r'^iot/asset/manuel/', views.ManuelCreateAsset.as_view()),
 
     # 添加原始数据
-    url(r'^iot/origin/$', views.AddOriginDataView.as_view()),  # 过期无效
     url(r'^iot/record/add/$', views.CreateRecord.as_view()),
 
     # job

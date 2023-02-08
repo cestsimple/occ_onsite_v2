@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.http import JsonResponse
 
 
@@ -19,3 +21,13 @@ def JResp(msg: str = "ok", status: int = 200, data: object = None) -> JsonRespon
             "msg": e,
             "status": 500,
         })
+
+
+def json_response(status: int = 200, msg: str = '', data: Any = None) -> dict:
+    res = {
+        'status': status,
+        'msg': msg,
+    }
+    if data is not None:
+        res['data'] = data
+    return res

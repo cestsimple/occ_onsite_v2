@@ -15,13 +15,12 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 from utils import jobs, JResp
 from utils.CustomMixins import UpdateListRetrieveViewSet
 from utils.pagination import PageNum
-from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record, OriginAssetData
+from .models import AsyncJob, Site, Asset, Variable, Apsa, Bulk, Record
 from .serializer import SiteSerializer, ApsaSerializer, BulkSerializer, VariableSerializer, AssetApsaSerializer, \
     AssetBulkSerializer, AsyncJobSerializer
 from ..onsite.models import MonthlyVariable
@@ -1103,90 +1102,6 @@ class AssetModelView(UpdateListRetrieveViewSet):
         return Response({'status': 200, 'msg': '保存成功'})
 
 
-class AddOriginDataView(View):
-    def get(self, request):
-        data = OriginAssetData.objects.all()
-        for row in data:
-            asset = Asset.objects.filter(uuid=row.uuid)
-            if asset.count() != 1:
-                print(f'ERROR: UUID错误{row.uuid}')
-            else:
-                asset = asset[0]
-                asset.rtu_name = row.rtu_name
-                asset.confirm = 1
-
-                if row.is_bulk:
-                    try:
-                        bulk = Bulk.objects.get(asset=asset)
-                        bulk.tank_size = row.tank_size
-                        bulk.level_a = row.levela
-                        bulk.level_b = row.levelb
-                        bulk.level_c = row.levelc
-                        bulk.level_d = row.leveld
-                        bulk.filling_js = 1
-                    except Exception as e:
-                        if 'TOT' not in row.tank_name:
-                            print(e)
-                            print(asset.id)
-                            print('-' * 100)
-                        asset.confirm = 0
-                else:
-                    try:
-                        apsa = Apsa.objects.get(asset=asset)
-                        apsa.temperature = row.temp
-                        if row.vap_max:
-                            apsa.vap_max = row.vap_max
-                        if row.fin:
-                            apsa.facility_fin = row.fin
-                        if row.vap_type:
-                            apsa.vap_type = row.vap_type
-                        apsa.norminal_flow = row.norminal
-                        apsa.daily_js = 1
-                        variables = Variable.objects.filter(asset=asset, daily_mark='H_STP400V')
-                        if variables.count() == 2:
-                            for v in variables:
-                                if v.name != row.stp_400v:
-                                    v.daily_mark = ''
-                                    v.save()
-
-                        # 判断变量是否满足11个或者12个
-                        daily_mark_list = [
-                            'M3_Q1', 'M3_Q5', 'M3_Q6', 'M3_Q7', 'M3_TOT', 'M3_PROD', 'H_PROD', 'H_STPAL',
-                            'H_STPDFT', 'H_STP400V', 'M3_PEAK',
-                        ]
-                        variables = Variable.objects.filter(asset=asset).filter(~Q(daily_mark=''))
-                        v_daily_mark_list = [x.daily_mark for x in variables]
-                        if variables.count == 11:
-                            if daily_mark_list.sort() != v_daily_mark_list.sort():
-                                apsa.daily_js = 0
-                        elif variables.count == 12:
-                            daily_mark_list.append('FLOW_METER')
-                            if daily_mark_list.sort() != v_daily_mark_list.sort():
-                                apsa.daily_js = 0
-                            daily_mark_list.remove('FLOW_METER')
-                        else:
-                            apsa.daily_js = 0
-
-                    except Exception as e:
-                        print(e)
-                        print(asset.id)
-                        print('-' * 100)
-                        asset.confirm = 0
-                        apsa.daily_js = 0
-
-                try:
-                    asset.save()
-                    if row.is_bulk:
-                        bulk.save()
-                    else:
-                        apsa.save()
-                except Exception as e:
-                    print(e)
-                    print(asset.id)
-                    print('-' * 100)
-        return JsonResponse({'status': 200})
-
-
 class AsyncJobModelView(ModelViewSet):
     """返回任务"""
     queryset = AsyncJob.objects.order_by('-start_time')
@@ -1235,75 +1150,6 @@ class AsyncJobModelView(ModelViewSet):
 
         # 返回成功
         return JResp()
-
-
-class RefreshAllAsset(APIView):
-    def get(self, request):
-        user = request.GET.get('user')
-        params = request.GET.get('params')
-
-        if jobs.check('IOT_SITE', silent=True) or \
-                jobs.check('IOT_ASSET', silent=True) or \
-                jobs.check('IOT_TAG', silent=True) or \
-                jobs.check('IOT_VARIABLE', silent=True) or \
-                jobs.check('IOT_ALL', user=user, params=params):
-            return Response('任务已存在', status=400)
-
-        threading.Thread(target=self.sub, args=(request,)).start()
-        return JsonResponse({'status': 200, 'msg': '请求成功，正在刷新所有iot资产'})
-
-    def sub(self, request):
-        # 获取当前时间，设定任务最大时间
-        time_now = datetime.now()
-        t_start = int(time.time())
-        max_duration = 25 * 60  # secs
-
-        # 创建任务实例
-        site = SiteData()
-        asset = AssetData()
-        tag = TagData()
-        variable = VariableData()
-
-        site_done = 0
-        asset_done = 0
-        tag_done = 0
-        variable_done = 0
-
-        # 按照顺序执行任务
-        while time.time() - t_start < max_duration:
-            # 开始site
-            if not site_done:
-                site.get(request)
-                site_done = 1
-
-            # 检测上一个任务完成再做
-            job = AsyncJob.objects.filter(name='IOT_SITE', start_time__gt=time_now).filter(~Q(result=''))
-            if job.count() == 1 and not asset_done:
-                print("IOT_SITE完成")
-                asset.get(request)
-                asset_done = 1
-
-            job = AsyncJob.objects.filter(name='IOT_ASSET', start_time__gt=time_now).filter(~Q(result=''))
-            if job.count() == 1 and not tag_done:
-                print("IOT_ASSET完成")
-                tag.get(request)
-                tag_done = 1
-
-            job = AsyncJob.objects.filter(name='IOT_TAG', start_time__gt=time_now).filter(~Q(result=''))
-            if job.count() == 1 and not variable_done:
-                print("IOT_TAG完成")
-                variable.get(request)
-                variable_done = 1
-
-            job = AsyncJob.objects.filter(name='IOT_VARIABLE', start_time__gt=time_now).filter(~Q(result=''))
-            if job.count() == 1:
-                print("IOT_VARIABLE完成")
-                # 任务完成，返回
-                jobs.update('IOT_ALL', 'OK')
-                return
-            time.sleep(1)
-        # 刷新超时，计入失败
-        jobs.update('IOT_ALL', 'ERROR: TIME OUT')
 
 
 class KillRecordTaskView(View):

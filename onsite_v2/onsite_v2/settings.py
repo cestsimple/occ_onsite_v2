@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'apps.onsite',
     'apps.ludan',
     'apps.ticket',
+    'apps.request',
     'corsheaders',
 ]
 

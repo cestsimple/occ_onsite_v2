@@ -4,13 +4,13 @@ from django.urls import path, include
 from django.views.generic import TemplateView
 from ninja import NinjaAPI, Router
 
-from apps.request.api import request_router
+from apps.questionnaire.api import questionnaire_router
 
 ninja_api = NinjaAPI(title="OCC ONLINE - API文档V3", version="dev", description="语言: Python\n框架: django-ninja",
                      docs_url='/api/docs')
 # 创建路由节点
 r = Router()
-r.add_router('', request_router)
+r.add_router('', questionnaire_router)
 
 # api添加路由
 ninja_api.add_router('/api', r)

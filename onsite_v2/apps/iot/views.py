@@ -1159,7 +1159,7 @@ class KillRecordTaskView(View):
             j.delete()
         main_jobs = AsyncJob.objects.filter(name__contains='RECORD', finish_time=None)
         for job in main_jobs:
-            job.result = 'ERROR: killed by api request'
+            job.result = 'ERROR: killed by api questionnaire'
             job.finish_time = datetime.now()
             job.save()
         return JsonResponse({"status": 200, 'msg': 'ok', 'affected rows': len(sub_jobs + 1)})

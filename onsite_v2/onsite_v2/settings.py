@@ -31,7 +31,7 @@ INSTALLED_APPS = [
     'apps.onsite',
     'apps.ludan',
     'apps.ticket',
-    'apps.request',
+    'apps.questionnaire',
     'corsheaders',
 ]
 
@@ -71,7 +71,7 @@ TEMPLATES = [
     #     'OPTIONS': {
     #         'context_processors': [
     #             'django.template.context_processors.debug',
-    #             'django.template.context_processors.request',
+    #             'django.template.context_processors.questionnaire',
     #             'django.contrib.auth.context_processors.auth',
     #             'django.contrib.messages.context_processors.messages',
     #         ],

@@ -10,17 +10,12 @@ from .schema import QuestionnaireOut, QuestionnaireIn
 questionnaire_router = Router(tags=["问卷相关"])
 
 
-@questionnaire_router.get("/request", summary="测试")
-def request_list(request):
-    return json_response()
-
-
 @questionnaire_router.get("/questionnaires", summary="问卷列表")
-def questionnaire_list(request, is_template: int = 0):
+def questionnaire_list(request, is_template: bool = False):
     # 获取用户名称，默认只能看自己创建的问卷
     user = "admin"
     # 查询问卷
-    qs = Questionnaire.objects.filter(created_user=user)
+    qs = Questionnaire.objects.filter(created_user__username=user)
     # 过滤问卷，是否只看模板
     if is_template:
         qs.filter(is_template=is_template)

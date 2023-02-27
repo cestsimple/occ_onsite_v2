@@ -1,5 +1,5 @@
-from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.db import models
 
 
 class User(AbstractUser):
@@ -22,6 +22,9 @@ class Role(models.Model):
     id = models.AutoField(primary_key=True, verbose_name='数字id')
     name = models.CharField(max_length=20, verbose_name='名称')
     description = models.CharField(max_length=50, verbose_name='描述')
+
+    def __str__(self):
+        return self.name
 
     class Meta:
         db_table = 'tb_users_role'

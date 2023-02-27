@@ -9,3 +9,11 @@ class QuestionnaireOut(Schema):
     is_public: int
     created_user: str
     assigned_role: str
+
+
+class QuestionnaireIn(Schema):
+    title: str
+    is_template: bool
+    is_public: bool
+    created_user: str
+    assigned_role: str

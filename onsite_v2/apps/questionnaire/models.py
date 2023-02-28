@@ -56,6 +56,7 @@ class Question(models.Model):
         indexes = [
             models.Index(fields=['questionnaire']),
         ]
+        unique_together = [['questionnaire', 'order']]
         ordering = ['questionnaire', 'order']
 
 

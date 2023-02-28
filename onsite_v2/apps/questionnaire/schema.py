@@ -1,4 +1,6 @@
 # -*- coding:utf-8 -*-
+from typing import Any
+
 from ninja import Schema
 
 
@@ -24,7 +26,21 @@ class QuestionnaireOut(Schema):
 
 class QuestionnaireIn(Schema):
     title: str
-    is_template: bool
-    is_public: bool
-    created_user: str
-    assigned_role: str
+    is_template: bool = False
+    is_public: bool = False
+    created_user: Any
+    assigned_role: Any
+
+
+class QuestionIn(Schema):
+    questionnaire: Any
+    content: str
+    question_type: str
+    order: int
+
+
+class QuestionOut(Schema):
+    questionnaire: QuestionnaireOut
+    content: str
+    question_type: str
+    order: int
